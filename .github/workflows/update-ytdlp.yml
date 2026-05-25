@@ -41,7 +41,15 @@ jobs:
         run: |
           LATEST="${{ steps.latest.outputs.version }}"
           CURRENT="${{ steps.current.outputs.version }}"
-          if [ "$LATEST" != "$CURRENT" ] && [ -n "$LATEST" ]; then
+          # Alert and fail if version check itself returned empty (PyPI down, regex changed, etc.)
+          if [ -z "$LATEST" ]; then
+            curl -s -X POST "${{ secrets.DISCORD_WEBHOOK_URL }}" \
+              -H "Content-Type: application/json" \
+              -d '{"content": "⚠️ **yt-dlp auto-update check FAILED** — could not determine latest version from PyPI. Manual check needed."}'
+            echo "LATEST is empty — version check failed"
+            exit 1
+          fi
+          if [ "$LATEST" != "$CURRENT" ]; then
             sed -i "s/^yt-dlp>=.*/yt-dlp>=${LATEST}/" requirements.txt
             echo "updated=true" >> $GITHUB_OUTPUT
             echo "Updated yt-dlp from $CURRENT to $LATEST"
