@@ -25,10 +25,20 @@ def send_failure_alert(webhook_url: str, failures: List[Dict[str, Any]], slot: i
     _post(webhook_url, "\n".join(lines))
 
 
-def send_daily_summary(webhook_url: str, db_rows: List[Dict[str, Any]]) -> None:
+def send_daily_summary(
+    webhook_url: str,
+    db_rows: List[Dict[str, Any]],
+    channel_names: Dict[str, str] = None,
+) -> None:
     """Post an end-of-day summary after slot 2 completes, covering both slots."""
     if not webhook_url:
         return
+
+    channel_names = channel_names or {}
+
+    def label(channel_id: str) -> str:
+        name = channel_names.get(channel_id)
+        return f"`{channel_id}` ({name})" if name else f"`{channel_id}`"
 
     success_rows = [r for r in db_rows if r["status"] == "success"]
     failed_rows = [r for r in db_rows if r["status"] == "failed"]
@@ -43,14 +53,11 @@ def send_daily_summary(webhook_url: str, db_rows: List[Dict[str, Any]]) -> None:
     for r in success_rows:
         yt_id = r.get("youtube_video_id")
         url = f"https://www.youtube.com/watch?v={yt_id}" if yt_id else "?"
-        slot = r.get("slot", "?")
-        lines.append(f"  ✓ `{r['channel_id']}` slot {slot} → {url}")
+        lines.append(f"  ✓ {label(r['channel_id'])} slot {r.get('slot', '?')} → {url}")
     for r in failed_rows:
-        slot = r.get("slot", "?")
-        lines.append(f"  ✗ `{r['channel_id']}` slot {slot} — {r.get('error_message', '?')}")
+        lines.append(f"  ✗ {label(r['channel_id'])} slot {r.get('slot', '?')} — {r.get('error_message', '?')}")
     for r in no_content_rows:
-        slot = r.get("slot", "?")
-        lines.append(f"  — `{r['channel_id']}` slot {slot}: no new content")
+        lines.append(f"  — {label(r['channel_id'])} slot {r.get('slot', '?')}: no new content")
 
     _post(webhook_url, "\n".join(lines))
 

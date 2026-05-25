@@ -80,7 +80,15 @@ def run_all_channels(
             send_failure_alert(webhook_url=webhook_url, failures=failures, slot=slot)
         # Send daily summary only on slot 2 (end of day), covering both slots from DB
         if slot == 2:
-            send_daily_summary(webhook_url=webhook_url, db_rows=get_todays_run_summary())
+            channel_names = {
+                ch["id"]: ch.get("youtube_channel_name", "")
+                for ch in config.get("channels", [])
+            }
+            send_daily_summary(
+                webhook_url=webhook_url,
+                db_rows=get_todays_run_summary(),
+                channel_names=channel_names,
+            )
 
     _log_summary(results)
     return results
