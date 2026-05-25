@@ -34,7 +34,7 @@ channels:
       - ootd
     youtube_category_id: "22"
     enabled: true
-    max_retry_days: 3
+    max_retry_days: 7
     shorts_max_seconds: 180
 
   - id: channel_2
@@ -50,7 +50,7 @@ channels:
       - viral
     youtube_category_id: "22"
     enabled: true
-    max_retry_days: 3
+    max_retry_days: 7
     shorts_max_seconds: 180
 
   - id: channel_3
@@ -66,5 +66,5 @@ channels:
       - viral
     youtube_category_id: "22"
     enabled: true
-    max_retry_days: 3
+    max_retry_days: 7
     shorts_max_seconds: 180
