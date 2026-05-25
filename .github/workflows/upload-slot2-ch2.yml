@@ -16,6 +16,10 @@ on:
         required: false
         default: "false"
 
+concurrency:
+  group: channel-2-uploads
+  cancel-in-progress: false
+
 jobs:
   upload:
     runs-on: ubuntu-latest
