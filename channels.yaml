@@ -52,3 +52,19 @@ channels:
     enabled: true
     max_retry_days: 3
     shorts_max_seconds: 180
+
+  - id: channel_3
+    tiktok_username: "__muk"
+    youtube_channel_name: "今日のむくぞ"
+    google_credentials_file: "credentials/channel_3_client_secret.json"
+    oauth_token_file: "tokens/channel_3_token.json"
+    videos_per_day: 2
+    description_footer: ""
+    default_tags:
+      - muk
+      - japanese
+      - viral
+    youtube_category_id: "22"
+    enabled: true
+    max_retry_days: 3
+    shorts_max_seconds: 180

@@ -1,0 +1,92 @@
+name: Upload Slot 1 - Channel 3 (11 AM PKT)
+
+on:
+  schedule:
+    # 06:00 UTC = 11:00 PKT (Pakistan Standard Time = UTC+5)
+    - cron: "0 6 * * *"
+  # Allow manual trigger from GitHub UI for testing
+  workflow_dispatch:
+    inputs:
+      channel:
+        description: "Run only this channel ID (leave blank for channel_3)"
+        required: false
+        default: ""
+      dry_run:
+        description: "Dry run (no actual upload)"
+        required: false
+        default: "false"
+
+concurrency:
+  group: channel-3-uploads
+  cancel-in-progress: false
+
+jobs:
+  upload:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Restore DB cache
+        uses: actions/cache@v4
+        with:
+          path: data/automation.db
+          key: automation-db-${{ github.sha }}-${{ github.run_id }}
+          restore-keys: |
+            automation-db-${{ github.sha }}-
+            automation-db-
+
+      - name: Restore credentials & tokens
+        run: |
+          mkdir -p credentials tokens
+          if [ -n "${{ secrets.CHANNEL_3_CLIENT_SECRET }}" ]; then
+            echo "${{ secrets.CHANNEL_3_CLIENT_SECRET }}" | base64 -d > credentials/channel_3_client_secret.json
+          fi
+          if [ -n "${{ secrets.CHANNEL_3_TOKEN }}" ]; then
+            echo "${{ secrets.CHANNEL_3_TOKEN }}" | base64 -d > tokens/channel_3_token.json
+          fi
+
+      - name: Write .env
+        run: |
+          echo "DISCORD_WEBHOOK_URL=${{ secrets.DISCORD_WEBHOOK_URL }}" >> .env
+          echo "LOG_LEVEL=INFO" >> .env
+          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+            echo "DRY_RUN=true" >> .env
+          else
+            echo "DRY_RUN=false" >> .env
+          fi
+
+      - name: Run Slot 1
+        run: |
+          # Default to channel_3 only; override with manual dispatch input if set
+          CHANNEL_ARG="--channel channel_3"
+          if [ -n "${{ github.event.inputs.channel }}" ]; then
+            CHANNEL_ARG="--channel ${{ github.event.inputs.channel }}"
+          fi
+          python run.py --slot 1 $CHANNEL_ARG
+
+      - name: Save DB cache
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: data/automation.db
+          key: automation-db-${{ github.run_id }}
+
+      - name: Upload logs as artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: logs-slot1-ch3-${{ github.run_id }}
+          path: logs/
+          retention-days: 14
