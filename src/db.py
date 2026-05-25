@@ -240,17 +240,33 @@ def count_uploads_today(channel_id: str) -> int:
 
 
 def get_todays_run_summary() -> List[Dict]:
-    """Return one row per channel per slot for today's runs."""
+    """Return one row per channel per slot for today's runs (no duplicates)."""
     conn = get_connection()
     rows = conn.execute("""
         SELECT r.channel_id, r.slot, r.status, r.videos_uploaded, r.error_message,
-               p.youtube_video_id, p.tiktok_title
+               (
+                   SELECT p.youtube_video_id
+                   FROM posted_videos p
+                   WHERE p.channel_id = r.channel_id
+                     AND p.status = 'uploaded'
+                     AND p.youtube_video_id NOT LIKE '%DRY_RUN%'
+                     AND date(p.posted_at) = r.run_date
+                   ORDER BY p.posted_at DESC
+                   LIMIT 1
+               ) AS youtube_video_id,
+               (
+                   SELECT p.tiktok_title
+                   FROM posted_videos p
+                   WHERE p.channel_id = r.channel_id
+                     AND p.status = 'uploaded'
+                     AND p.youtube_video_id NOT LIKE '%DRY_RUN%'
+                     AND date(p.posted_at) = r.run_date
+                   ORDER BY p.posted_at DESC
+                   LIMIT 1
+               ) AS tiktok_title
         FROM runs r
-        LEFT JOIN posted_videos p
-            ON p.channel_id = r.channel_id
-            AND p.status = 'uploaded'
-            AND date(p.posted_at) = date('now')
         WHERE r.run_date = date('now')
+          AND r.status != 'running'
         ORDER BY r.channel_id, r.slot
     """).fetchall()
     conn.close()
