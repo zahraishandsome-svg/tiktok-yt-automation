@@ -9,6 +9,7 @@ from typing import Dict, Any, List, Optional
 
 from .config import get_enabled_channels
 from .channel_runner import run_channel
+from .db import get_todays_run_summary
 from .notifier import send_failure_alert, send_daily_summary
 
 logger = logging.getLogger(__name__)
@@ -77,9 +78,9 @@ def run_all_channels(
     if webhook_url:
         if failures:
             send_failure_alert(webhook_url=webhook_url, failures=failures, slot=slot)
-        # Send daily summary only on slot 2 (end of day) to avoid noise
+        # Send daily summary only on slot 2 (end of day), covering both slots from DB
         if slot == 2:
-            send_daily_summary(webhook_url=webhook_url, results=results)
+            send_daily_summary(webhook_url=webhook_url, db_rows=get_todays_run_summary())
 
     _log_summary(results)
     return results

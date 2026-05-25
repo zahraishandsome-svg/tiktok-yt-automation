@@ -239,6 +239,24 @@ def count_uploads_today(channel_id: str) -> int:
     return row["total"] if row else 0
 
 
+def get_todays_run_summary() -> List[Dict]:
+    """Return one row per channel per slot for today's runs."""
+    conn = get_connection()
+    rows = conn.execute("""
+        SELECT r.channel_id, r.slot, r.status, r.videos_uploaded, r.error_message,
+               p.youtube_video_id, p.tiktok_title
+        FROM runs r
+        LEFT JOIN posted_videos p
+            ON p.channel_id = r.channel_id
+            AND p.status = 'uploaded'
+            AND date(p.posted_at) = date('now')
+        WHERE r.run_date = date('now')
+        ORDER BY r.channel_id, r.slot
+    """).fetchall()
+    conn.close()
+    return [dict(row) for row in rows]
+
+
 def slot_already_ran(channel_id: str, slot: int) -> bool:
     """True if this slot already completed successfully today (prevents double-runs)."""
     conn = get_connection()

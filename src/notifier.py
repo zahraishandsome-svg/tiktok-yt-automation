@@ -25,25 +25,32 @@ def send_failure_alert(webhook_url: str, failures: List[Dict[str, Any]], slot: i
     _post(webhook_url, "\n".join(lines))
 
 
-def send_daily_summary(webhook_url: str, results: List[Dict[str, Any]]) -> None:
-    """Post an end-of-day summary after slot 2 completes."""
+def send_daily_summary(webhook_url: str, db_rows: List[Dict[str, Any]]) -> None:
+    """Post an end-of-day summary after slot 2 completes, covering both slots."""
     if not webhook_url:
         return
 
-    success = [r for r in results if r["status"] == "success"]
-    failed = [r for r in results if r["status"] == "failed"]
-    no_content = [r for r in results if r["status"] == "no_content"]
+    success_rows = [r for r in db_rows if r["status"] == "success"]
+    failed_rows = [r for r in db_rows if r["status"] == "failed"]
+    no_content_rows = [r for r in db_rows if r["status"] == "no_content"]
 
-    emoji = "✅" if not failed else "⚠️"
+    emoji = "✅" if not failed_rows else "⚠️"
     lines = [
         f"{emoji} **Daily Upload Summary** ({date.today()})",
-        f"Uploaded: {len(success)} | Failed: {len(failed)} | No content: {len(no_content)}",
+        f"Uploaded: {len(success_rows)} | Failed: {len(failed_rows)} | No content: {len(no_content_rows)}",
     ]
 
-    for r in success:
-        lines.append(f"  ✓ `{r['channel_id']}` → {r.get('youtube_url', '?')}")
-    for r in failed:
-        lines.append(f"  ✗ `{r['channel_id']}` — {r.get('error', '?')}")
+    for r in success_rows:
+        yt_id = r.get("youtube_video_id")
+        url = f"https://www.youtube.com/watch?v={yt_id}" if yt_id else "?"
+        slot = r.get("slot", "?")
+        lines.append(f"  ✓ `{r['channel_id']}` slot {slot} → {url}")
+    for r in failed_rows:
+        slot = r.get("slot", "?")
+        lines.append(f"  ✗ `{r['channel_id']}` slot {slot} — {r.get('error_message', '?')}")
+    for r in no_content_rows:
+        slot = r.get("slot", "?")
+        lines.append(f"  — `{r['channel_id']}` slot {slot}: no new content")
 
     _post(webhook_url, "\n".join(lines))
 
