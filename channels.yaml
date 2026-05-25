@@ -36,3 +36,19 @@ channels:
     enabled: true
     max_retry_days: 3
     shorts_max_seconds: 180
+
+  - id: channel_2
+    tiktok_username: "miraikun0515.dayo"
+    youtube_channel_name: "miraikun.dayo1"
+    google_credentials_file: "credentials/channel_2_client_secret.json"
+    oauth_token_file: "tokens/channel_2_token.json"
+    videos_per_day: 2
+    description_footer: ""
+    default_tags:
+      - miraikun
+      - japanese
+      - viral
+    youtube_category_id: "22"
+    enabled: true
+    max_retry_days: 3
+    shorts_max_seconds: 180

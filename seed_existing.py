@@ -203,7 +203,7 @@ def seed(channel_cfg: dict) -> None:
     if unmatched_yt:
         print(f"  YouTube videos NOT matched ({len(unmatched_yt)}) — may be original content or title mismatch:")
         for norm_title, yt_id in unmatched_yt[:10]:
-            print(f"    yt:{yt_id} | {norm_title[:70]}")
+            print(f"    yt:{yt_id} | {norm_title[:70].encode('ascii','replace').decode()}")
         if len(unmatched_yt) > 10:
             print(f"    ... and {len(unmatched_yt) - 10} more")
 
