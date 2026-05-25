@@ -1,24 +1,15 @@
-name: Upload Slot 2 - Channel 1 (10 PM PKT)
+name: Daily Summary (12 AM PKT)
 
 on:
   schedule:
-    # 17:00 UTC = 22:00 PKT (Pakistan Standard Time = UTC+5)
-    - cron: "0 17 * * *"
+    # 19:00 UTC = 00:00 PKT next day (Pakistan Standard Time = UTC+5)
+    - cron: "0 19 * * *"
   workflow_dispatch:
-    inputs:
-      channel:
-        description: "Run only this channel ID (leave blank for all)"
-        required: false
-        default: ""
-      dry_run:
-        description: "Dry run (no actual upload)"
-        required: false
-        default: "false"
 
 jobs:
-  upload:
+  summary:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 10
 
     steps:
       - name: Checkout repo
@@ -62,20 +53,9 @@ jobs:
         run: |
           echo "DISCORD_WEBHOOK_URL=${{ secrets.DISCORD_WEBHOOK_URL }}" >> .env
           echo "LOG_LEVEL=INFO" >> .env
-          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
-            echo "DRY_RUN=true" >> .env
-          else
-            echo "DRY_RUN=false" >> .env
-          fi
 
-      - name: Run Slot 2
-        run: |
-          # Default to channel_1 only; override with manual dispatch input if set
-          CHANNEL_ARG="--channel channel_1"
-          if [ -n "${{ github.event.inputs.channel }}" ]; then
-            CHANNEL_ARG="--channel ${{ github.event.inputs.channel }}"
-          fi
-          python run.py --slot 2 $CHANNEL_ARG
+      - name: Send daily summary
+        run: python run.py --summary-only
 
       - name: Save DB cache
         if: always()
@@ -88,6 +68,6 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: logs-slot2-${{ github.run_id }}
+          name: logs-daily-summary-${{ github.run_id }}
           path: logs/
           retention-days: 14
