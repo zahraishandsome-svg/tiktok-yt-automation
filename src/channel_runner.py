@@ -5,7 +5,7 @@ Returns a result dict so orchestrator can aggregate and notify.
 """
 
 import logging
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Dict, Any, Optional
 
@@ -144,12 +144,24 @@ def _pick_next_video(channel: Dict[str, Any], slot: int) -> Optional[Dict[str, A
 
     This ensures new content always floats to the top while failed videos
     get their retry window without blocking the queue indefinitely.
+
+    Supports two optional channel config keys:
+      min_upload_date       YYYY-MM-DD — ignore TikTok videos older than this date.
+      min_backlog_for_slot1 int — slot 1 is skipped unless at least this many
+                            unuploaded eligible videos exist. When the backlog drops
+                            below this threshold the channel automatically falls back
+                            to 1 upload/day (slot 2 only).
     """
     channel_id = channel["id"]
     today = date.today()
 
-    # Check for pending retries first
+    # Resolve optional date filter → Unix timestamp
+    min_ts = _parse_min_upload_date(channel.get("min_upload_date"))
+
+    # Check for pending retries first (apply date filter if configured)
     retries = db.get_videos_for_retry(channel_id, today)
+    if min_ts is not None:
+        retries = [r for r in retries if (r.get("tiktok_timestamp") or 0) >= min_ts]
     if retries:
         logger.info("[%s] Found %d video(s) due for retry", channel_id, len(retries))
         return {
@@ -170,15 +182,53 @@ def _pick_next_video(channel: Dict[str, Any], slot: int) -> Optional[Dict[str, A
     if not videos:
         return None
 
-    already_posted = db.get_posted_video_ids(channel_id)
+    # Apply upload-date filter (monetised channels, fresh content only)
+    if min_ts is not None:
+        before = len(videos)
+        videos = [v for v in videos if (v.get("timestamp") or 0) >= min_ts]
+        filtered = before - len(videos)
+        if filtered:
+            logger.info(
+                "[%s] Filtered %d video(s) older than min_upload_date (%s)",
+                channel_id, filtered, channel["min_upload_date"],
+            )
 
-    for video in videos:  # already sorted newest-first
-        if video["id"] not in already_posted:
-            # Record it in DB so we can track it even if download fails
-            db.record_video_seen(channel_id, video)
-            return video
+    already_posted = db.get_posted_video_ids(channel_id)
+    eligible = [v for v in videos if v["id"] not in already_posted]
+
+    # Slot throttle: skip slot 1 when backlog is too small so the remaining
+    # video(s) are preserved for slot 2.  Once the backlog runs out entirely
+    # both slots return no_content and the channel idles until new TikTok
+    # videos arrive.
+    min_backlog = channel.get("min_backlog_for_slot1")
+    if slot == 1 and min_backlog is not None and len(eligible) < int(min_backlog):
+        logger.info(
+            "[%s] Slot 1 throttled — %d eligible video(s) available, "
+            "need %d (min_backlog_for_slot1). Reserving for slot 2.",
+            channel_id, len(eligible), int(min_backlog),
+        )
+        return None
+
+    for video in eligible:
+        # Record it in DB so we can track it even if download fails
+        db.record_video_seen(channel_id, video)
+        return video
 
     return None
+
+
+def _parse_min_upload_date(min_date_str: Optional[str]) -> Optional[int]:
+    """Convert 'YYYY-MM-DD' string to a Unix timestamp int, or None if not set."""
+    if not min_date_str:
+        return None
+    try:
+        return int(datetime.strptime(min_date_str, "%Y-%m-%d").timestamp())
+    except ValueError:
+        logger.warning(
+            "Invalid min_upload_date %r — expected YYYY-MM-DD format, ignoring filter",
+            min_date_str,
+        )
+        return None
 
 
 # ── Download ──────────────────────────────────────────────────────────────────
