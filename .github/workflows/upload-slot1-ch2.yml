@@ -17,7 +17,7 @@ on:
         default: "false"
 
 concurrency:
-  group: channel-2-uploads
+  group: yt-uploads
   cancel-in-progress: false
 
 jobs:
