@@ -1,4 +1,4 @@
-name: Upload Slot 2 (1 AM PKT)
+name: Upload Slot 2 - Channel 1 (1 AM PKT)
 
 on:
   schedule:
@@ -61,7 +61,8 @@ jobs:
 
       - name: Run Slot 2
         run: |
-          CHANNEL_ARG=""
+          # Default to channel_1 only; override with manual dispatch input if set
+          CHANNEL_ARG="--channel channel_1"
           if [ -n "${{ github.event.inputs.channel }}" ]; then
             CHANNEL_ARG="--channel ${{ github.event.inputs.channel }}"
           fi

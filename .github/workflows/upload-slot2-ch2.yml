@@ -1,14 +1,14 @@
-name: Upload Slot 1 - Channel 1 (8 PM PKT)
+name: Upload Slot 2 - Channel 2 (3 PM PKT)
 
 on:
   schedule:
-    # 15:00 UTC = 20:00 PKT (Pakistan Standard Time = UTC+5)
-    - cron: "0 15 * * *"
+    # 10:00 UTC = 15:00 PKT (Pakistan Standard Time = UTC+5)
+    - cron: "0 10 * * *"
   # Allow manual trigger from GitHub UI for testing
   workflow_dispatch:
     inputs:
       channel:
-        description: "Run only this channel ID (leave blank for channel_1)"
+        description: "Run only this channel ID (leave blank for channel_2)"
         required: false
         default: ""
       dry_run:
@@ -37,16 +37,6 @@ jobs:
       - name: Restore credentials & tokens
         run: |
           mkdir -p credentials tokens
-          # Each channel's credentials are stored as GitHub Secrets
-          # Secret name format: CHANNEL_1_CLIENT_SECRET (base64-encoded JSON)
-          # Token name format:  CHANNEL_1_TOKEN (base64-encoded JSON)
-          # Add more channels here as you onboard them.
-          if [ -n "${{ secrets.CHANNEL_1_CLIENT_SECRET }}" ]; then
-            echo "${{ secrets.CHANNEL_1_CLIENT_SECRET }}" | base64 -d > credentials/channel_1_client_secret.json
-          fi
-          if [ -n "${{ secrets.CHANNEL_1_TOKEN }}" ]; then
-            echo "${{ secrets.CHANNEL_1_TOKEN }}" | base64 -d > tokens/channel_1_token.json
-          fi
           if [ -n "${{ secrets.CHANNEL_2_CLIENT_SECRET }}" ]; then
             echo "${{ secrets.CHANNEL_2_CLIENT_SECRET }}" | base64 -d > credentials/channel_2_client_secret.json
           fi
@@ -58,26 +48,25 @@ jobs:
         run: |
           echo "DISCORD_WEBHOOK_URL=${{ secrets.DISCORD_WEBHOOK_URL }}" >> .env
           echo "LOG_LEVEL=INFO" >> .env
-          # Override dry_run from workflow_dispatch input
           if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
             echo "DRY_RUN=true" >> .env
           else
             echo "DRY_RUN=false" >> .env
           fi
 
-      - name: Run Slot 1
+      - name: Run Slot 2
         run: |
-          # Default to channel_1 only; override with manual dispatch input if set
-          CHANNEL_ARG="--channel channel_1"
+          # Default to channel_2 only; override with manual dispatch input if set
+          CHANNEL_ARG="--channel channel_2"
           if [ -n "${{ github.event.inputs.channel }}" ]; then
             CHANNEL_ARG="--channel ${{ github.event.inputs.channel }}"
           fi
-          python run.py --slot 1 $CHANNEL_ARG
+          python run.py --slot 2 $CHANNEL_ARG
 
       - name: Upload logs as artifact
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: logs-slot1-${{ github.run_id }}
+          name: logs-slot2-ch2-${{ github.run_id }}
           path: logs/
           retention-days: 14
