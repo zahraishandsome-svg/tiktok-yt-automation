@@ -87,13 +87,19 @@ def run_channel(channel: Dict[str, Any], slot: int, dry_run: bool = False) -> Di
         youtube_id = _upload_video(channel, video, local_file, short, dry_run)
 
         if youtube_id:
-            db.mark_uploaded(channel_id, video["id"], youtube_id)
+            if not dry_run:
+                db.mark_uploaded(channel_id, video["id"], youtube_id)
+                db.finish_run(run_id, "success", videos_uploaded=1)
+            else:
+                # Dry run: do NOT write to DB so real runs aren't blocked
+                db.finish_run(run_id, "dry_run", videos_uploaded=0)
+                logger.info("[%s] [DRY RUN] Would have uploaded: https://www.youtube.com/watch?v=%s", channel_id, youtube_id)
             cleanup_download(local_file)
-            db.finish_run(run_id, "success", videos_uploaded=1)
             result["status"] = "success"
             result["video_uploaded"] = video.get("title", video["id"])
             result["youtube_url"] = f"https://www.youtube.com/watch?v={youtube_id}"
-            logger.info("[%s] ✓ Uploaded: %s", channel_id, result["youtube_url"])
+            if not dry_run:
+                logger.info("[%s] ✓ Uploaded: %s", channel_id, result["youtube_url"])
         else:
             _handle_upload_failure(channel, video, "Upload returned no video ID")
             db.finish_run(run_id, "failed", error_message="Upload failed")
