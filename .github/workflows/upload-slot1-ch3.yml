@@ -1,9 +1,9 @@
-name: Upload Slot 1 - Channel 3 (11 AM PKT)
+name: Upload Slot 1 - Channel 3 (2 PM PKT)
 
 on:
   schedule:
-    # 06:00 UTC = 11:00 PKT (Pakistan Standard Time = UTC+5)
-    - cron: "0 6 * * *"
+    # 09:00 UTC = 14:00 PKT (Pakistan Standard Time = UTC+5)
+    - cron: "0 9 * * *"
   # Allow manual trigger from GitHub UI for testing
   workflow_dispatch:
     inputs:
@@ -88,5 +88,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: logs-slot1-ch3-${{ github.run_id }}
+
           path: logs/
           retention-days: 14
