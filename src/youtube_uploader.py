@@ -6,6 +6,8 @@ Tokens auto-refresh when expired. First run triggers a browser OAuth consent flo
 
 import json
 import logging
+import random
+import time
 from pathlib import Path
 from typing import Optional, Dict, Any
 
@@ -21,6 +23,10 @@ logger = logging.getLogger(__name__)
 SCOPES = ["https://www.googleapis.com/auth/youtube.upload"]
 YT_TITLE_LIMIT = 100      # YouTube hard limit
 YT_DESCRIPTION_LIMIT = 5000
+
+# HTTP status codes that are transient and safe to retry
+_TRANSIENT_STATUS_CODES = {500, 502, 503, 504}
+_MAX_UPLOAD_RETRIES = 5
 
 
 def get_authenticated_client(credentials_file: Path, token_file: Path):
@@ -112,13 +118,27 @@ def upload_video(
 
     response = None
     last_progress = -1
+    retry_count = 0
     while response is None:
-        status, response = request.next_chunk()
-        if status:
-            pct = int(status.progress() * 100)
-            if pct != last_progress:
-                logger.info("Upload progress: %d%%", pct)
-                last_progress = pct
+        try:
+            status, response = request.next_chunk()
+            if status:
+                pct = int(status.progress() * 100)
+                if pct != last_progress:
+                    logger.info("Upload progress: %d%%", pct)
+                    last_progress = pct
+            retry_count = 0  # reset on any successful chunk
+        except HttpError as exc:
+            if exc.resp.status in _TRANSIENT_STATUS_CODES and retry_count < _MAX_UPLOAD_RETRIES:
+                retry_count += 1
+                wait = min(60, (2 ** retry_count) + random.uniform(0, 1))
+                logger.warning(
+                    "Upload transient error %s — retry %d/%d in %.1fs",
+                    exc.resp.status, retry_count, _MAX_UPLOAD_RETRIES, wait,
+                )
+                time.sleep(wait)
+            else:
+                raise
 
     video_id = response.get("id")
     video_url = f"https://www.youtube.com/watch?v={video_id}"

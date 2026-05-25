@@ -24,6 +24,8 @@ jobs:
   upload:
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout repo
@@ -82,6 +84,21 @@ jobs:
         with:
           path: data/automation.db
           key: automation-db-${{ github.run_id }}
+
+      - name: Commit DB to repo
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -f data/automation.db
+          if ! git diff --staged --quiet; then
+            git commit -m "chore: update automation.db [skip ci]"
+            git fetch origin main
+            git rebase origin/main
+            git push origin HEAD:main
+          else
+            echo "No DB changes to commit"
+          fi
 
       - name: Upload logs as artifact
         if: always()

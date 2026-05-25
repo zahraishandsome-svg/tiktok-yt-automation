@@ -24,6 +24,10 @@ PROJECT_ROOT = Path(__file__).parent.parent
 DOWNLOADS_DIR = PROJECT_ROOT / "downloads"
 
 
+class TikTokUnreachableError(Exception):
+    """Raised when the TikTok profile fetch fails after all retries."""
+
+
 def run_channel(channel: Dict[str, Any], slot: int, dry_run: bool = False) -> Dict[str, Any]:
     """
     Full pipeline for one channel, one slot.
@@ -106,6 +110,13 @@ def run_channel(channel: Dict[str, Any], slot: int, dry_run: bool = False) -> Di
             result["status"] = "failed"
             result["error"] = "Upload returned no video ID"
 
+    except TikTokUnreachableError as exc:
+        error_msg = str(exc)
+        logger.error("[%s] %s", channel_id, error_msg)
+        db.finish_run(run_id, "failed", error_message=error_msg)
+        result["status"] = "failed"
+        result["error"] = error_msg
+
     except HttpError as exc:
         error_msg = f"YouTube API error: {exc.reason}"
         logger.error("[%s] %s", channel_id, error_msg)
@@ -150,6 +161,12 @@ def _pick_next_video(channel: Dict[str, Any], slot: int) -> Optional[Dict[str, A
 
     # Fetch fresh profile and find newest unposted
     videos = get_profile_videos(channel["tiktok_username"])
+    if videos is None:
+        # None = fetch failed (network error / TikTok blocked runner IP)
+        # Raise so run_channel can distinguish this from "no new content"
+        raise TikTokUnreachableError(
+            f"TikTok profile @{channel['tiktok_username']} is unreachable after retries"
+        )
     if not videos:
         return None
 
