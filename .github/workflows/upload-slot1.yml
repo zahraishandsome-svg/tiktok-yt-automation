@@ -2,8 +2,8 @@ name: Upload Slot 1 - Channel 1 (8 PM PKT)
 
 on:
   schedule:
-    # 15:00 UTC = 20:00 PKT (Pakistan Standard Time = UTC+5)
-    - cron: "0 15 * * *"
+    # Upload at 13:00 UTC — video scheduled to go Public at 15:00 UTC (8 PM PKT)
+    - cron: "0 13 * * *"
   # Allow manual trigger from GitHub UI for testing
   workflow_dispatch:
     inputs:
