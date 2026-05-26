@@ -240,7 +240,17 @@ def count_uploads_today(channel_id: str) -> int:
 
 
 def get_todays_run_summary() -> List[Dict]:
-    """Return one row per channel per slot for today's runs (no duplicates)."""
+    """
+    Return exactly one row per channel per slot for today's runs.
+
+    Two bugs fixed vs. the naive query:
+      1. Deduplication — if a slot ran more than once today (e.g. a local run
+         followed by the scheduled GitHub Actions run), only the most recent
+         run (highest id) is returned.
+      2. Per-slot video URL — the subquery now matches posted_at to the
+         specific run's started_at/completed_at window so slot 1 and slot 2
+         never share the same video URL in the summary.
+    """
     conn = get_connection()
     rows = conn.execute("""
         SELECT r.channel_id, r.slot, r.status, r.videos_uploaded, r.error_message,
@@ -250,7 +260,8 @@ def get_todays_run_summary() -> List[Dict]:
                    WHERE p.channel_id = r.channel_id
                      AND p.status = 'uploaded'
                      AND p.youtube_video_id NOT LIKE '%DRY_RUN%'
-                     AND date(p.posted_at) = r.run_date
+                     AND p.posted_at >= r.started_at
+                     AND p.posted_at <= COALESCE(r.completed_at, datetime('now'))
                    ORDER BY p.posted_at DESC
                    LIMIT 1
                ) AS youtube_video_id,
@@ -260,13 +271,21 @@ def get_todays_run_summary() -> List[Dict]:
                    WHERE p.channel_id = r.channel_id
                      AND p.status = 'uploaded'
                      AND p.youtube_video_id NOT LIKE '%DRY_RUN%'
-                     AND date(p.posted_at) = r.run_date
+                     AND p.posted_at >= r.started_at
+                     AND p.posted_at <= COALESCE(r.completed_at, datetime('now'))
                    ORDER BY p.posted_at DESC
                    LIMIT 1
                ) AS tiktok_title
         FROM runs r
         WHERE r.run_date = date('now')
           AND r.status != 'running'
+          AND r.id = (
+              SELECT MAX(r2.id) FROM runs r2
+              WHERE r2.channel_id = r.channel_id
+                AND r2.slot = r.slot
+                AND r2.run_date = r.run_date
+                AND r2.status != 'running'
+          )
         ORDER BY r.channel_id, r.slot
     """).fetchall()
     conn.close()
