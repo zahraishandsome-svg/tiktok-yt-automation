@@ -5,7 +5,7 @@ Returns a result dict so orchestrator can aggregate and notify.
 """
 
 import logging
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Dict, Any, Optional
 
@@ -88,7 +88,7 @@ def run_channel(channel: Dict[str, Any], slot: int, dry_run: bool = False) -> Di
         )
 
         # Upload
-        youtube_id = _upload_video(channel, video, local_file, short, dry_run)
+        youtube_id = _upload_video(channel, video, local_file, short, slot, dry_run)
 
         if youtube_id:
             if not dry_run:
@@ -265,7 +265,8 @@ def _handle_download_failure(channel: Dict[str, Any], video: Dict[str, Any],
 # ── Upload ────────────────────────────────────────────────────────────────────
 
 def _upload_video(channel: Dict[str, Any], video: Dict[str, Any],
-                  local_file: Path, is_short: bool, dry_run: bool) -> Optional[str]:
+                  local_file: Path, is_short: bool, slot: int,
+                  dry_run: bool) -> Optional[str]:
     youtube = get_authenticated_client(
         credentials_file=channel["google_credentials_file"],
         token_file=channel["oauth_token_file"],
@@ -279,8 +280,50 @@ def _upload_video(channel: Dict[str, Any], video: Dict[str, Any],
         category_id=str(channel.get("youtube_category_id", "22")),
         is_short=is_short,
         description_footer=channel.get("description_footer", ""),
+        publish_at=_get_publish_at(channel, slot),
         dry_run=dry_run,
     )
+
+
+def _get_publish_at(channel: Dict[str, Any], slot: int) -> Optional[str]:
+    """
+    Calculate the UTC publish time for this slot using slot_publish_times_utc config.
+    Returns an ISO 8601 UTC string (e.g. '2026-05-26T15:00:00Z') when the target
+    time is more than 15 minutes in the future — video uploads as Private and
+    YouTube makes it Public at exactly that time, regardless of when GitHub ran.
+    Returns None if no publish time is configured or the target is already past
+    (falls back to immediate Public upload).
+    """
+    times = channel.get("slot_publish_times_utc") or {}
+    # Accept both int and string keys from YAML
+    time_str = times.get(slot) or times.get(str(slot))
+    if not time_str:
+        return None
+
+    try:
+        h, m = map(int, str(time_str).split(":"))
+    except (ValueError, AttributeError):
+        logger.warning("[%s] Invalid slot_publish_times_utc value: %r", channel["id"], time_str)
+        return None
+
+    now = datetime.now(timezone.utc)
+    target = now.replace(hour=h, minute=m, second=0, microsecond=0)
+    delta_seconds = (target - now).total_seconds()
+
+    if delta_seconds < 900:   # less than 15 min away or already past
+        logger.info(
+            "[%s] Slot %d target publish time %02d:%02dZ is past or too close "
+            "(%.0f s) — publishing immediately",
+            channel["id"], slot, h, m, delta_seconds,
+        )
+        return None
+
+    publish_at = target.strftime("%Y-%m-%dT%H:%M:%SZ")
+    logger.info(
+        "[%s] Slot %d will publish at %s (%d min from now)",
+        channel["id"], slot, publish_at, int(delta_seconds / 60),
+    )
+    return publish_at
 
 
 def _handle_upload_failure(channel: Dict[str, Any], video: Dict[str, Any],

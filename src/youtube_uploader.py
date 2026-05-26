@@ -66,6 +66,7 @@ def upload_video(
     category_id: str,
     is_short: bool,
     description_footer: str = "",
+    publish_at: Optional[str] = None,
     dry_run: bool = False,
 ) -> Optional[str]:
     """
@@ -82,14 +83,18 @@ def upload_video(
         final_tags.append("Shorts")
 
     logger.info(
-        "Preparing upload | title='%s' | short=%s | tags=%s | dry_run=%s",
-        final_title, is_short, final_tags, dry_run,
+        "Preparing upload | title='%s' | short=%s | tags=%s | publish_at=%s | dry_run=%s",
+        final_title, is_short, final_tags, publish_at or "immediate", dry_run,
     )
 
     if dry_run:
         logger.info("[DRY RUN] Would upload: %s", video_path.name)
         return "DRY_RUN_VIDEO_ID"
 
+    # Use scheduled publishing when publish_at is provided — video is uploaded as
+    # Private and YouTube makes it Public at exactly the specified UTC time.
+    # This decouples upload time from publish time so GitHub Actions delays
+    # never affect when viewers actually see the video.
     body = {
         "snippet": {
             "title": final_title,
@@ -98,10 +103,13 @@ def upload_video(
             "categoryId": category_id,
         },
         "status": {
-            "privacyStatus": "public",
+            "privacyStatus": "private" if publish_at else "public",
             "selfDeclaredMadeForKids": False,
         },
     }
+    if publish_at:
+        body["status"]["publishAt"] = publish_at
+        logger.info("Video will go Public at: %s", publish_at)
 
     media = MediaFileUpload(
         str(video_path),

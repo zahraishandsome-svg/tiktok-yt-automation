@@ -41,6 +41,11 @@ channels:
     enabled: true
     max_retry_days: 7
     shorts_max_seconds: 180
+    # Scheduled publishing: video uploads as Private, goes Public at exact UTC time.
+    # GitHub Actions delays never affect when viewers see the video.
+    slot_publish_times_utc:
+      1: "15:00"   # 8 PM PKT  (UTC+5)
+      2: "17:00"   # 10 PM PKT (UTC+5)
 
   - id: channel_2
     tiktok_username: "miraikun0515.dayo"
@@ -57,6 +62,9 @@ channels:
     enabled: true
     max_retry_days: 7
     shorts_max_seconds: 180
+    slot_publish_times_utc:
+      1: "09:00"   # 2 PM PKT  (UTC+5)
+      2: "10:00"   # 3 PM PKT  (UTC+5)
 
   - id: channel_3
     tiktok_username: "__muk"
@@ -77,3 +85,6 @@ channels:
     min_upload_date: "2026-01-01"
     # Drop to 1 upload/day (slot 2 only) once fewer than 2 unuploaded videos remain
     min_backlog_for_slot1: 2
+    slot_publish_times_utc:
+      1: "09:00"   # 2 PM PKT  (UTC+5)
+      2: "10:00"   # 3 PM PKT  (UTC+5)
