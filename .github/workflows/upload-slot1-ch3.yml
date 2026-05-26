@@ -2,8 +2,9 @@ name: Upload Slot 1 - Channel 3 (2 PM PKT)
 
 on:
   schedule:
-    # Upload at 07:00 UTC — video scheduled to go Public at 09:00 UTC (2 PM PKT)
-    - cron: "0 7 * * *"
+    # Upload at 07:30 UTC — video scheduled to go Public at 09:00 UTC (2 PM PKT)
+    # Offset 30 min from ch2 (also 07:xx) to avoid concurrency queue buildup
+    - cron: "30 7 * * *"
   # Allow manual trigger from GitHub UI for testing
   workflow_dispatch:
     inputs:

@@ -1,0 +1,53 @@
+YouTube API Client - Implementation Overview
+=============================================
+
+API Client Name: tiktok-yt-automation
+GCP Project: tiktok-yt-channel1 (Project Number: 386224840149)
+
+DESCRIPTION
+-----------
+This is a content automation platform that downloads short-form videos from TikTok
+and reposts them to YouTube channels using the YouTube Data API v3.
+
+YOUTUBE API USAGE
+-----------------
+APIs Used: YouTube Data API v3
+
+Endpoints accessed:
+- videos.insert  : Upload videos to YouTube channels
+- videos.list    : Check existing uploads
+
+Upload flow:
+1. Video is downloaded from TikTok source channel
+2. Video is uploaded via videos.insert with status privacyStatus="private" and a
+   scheduled publishAt timestamp so the video goes public at a controlled time
+3. Metadata (title, description, tags, category) is set during upload
+
+CHANNELS MANAGED
+----------------
+- channel_1 : 2 uploads/day (slots at 15:00 UTC and 17:00 UTC)
+- channel_2 : 2 uploads/day (slots at 09:00 UTC and 10:00 UTC)
+- channel_3 : 1-2 uploads/day (slots at 09:00 UTC and 10:00 UTC)
+
+QUOTA USAGE (current)
+----------------------
+videos.insert = 1600 units per upload
+Daily uploads = ~6 uploads/day across 3 channels
+Daily quota used ≈ 9,600 units (within 10,000 default limit)
+
+QUOTA REQUEST
+-------------
+Requesting 1,000,000 units/day to support scaling to additional channels
+over time as the business grows.
+
+ARCHITECTURE
+------------
+- GitHub Actions triggers scheduled Python jobs
+- Python script using google-auth and googleapiclient libraries
+- OAuth2 credentials per channel stored as GitHub secrets
+- SQLite database tracks uploaded videos to prevent duplicates
+
+ACCESS
+------
+The API client is not publicly accessible — it is a private automation script.
+All uploads are made on behalf of channel owners who have authenticated via OAuth2.
