@@ -15,9 +15,8 @@ on:
         required: false
         default: "false"
 
-concurrency:
-  group: yt-uploads
-  cancel-in-progress: false
+env:
+  DB_PAGE_ID: channel_1
 
 jobs:
   upload:
@@ -42,11 +41,11 @@ jobs:
       - name: Restore DB cache
         uses: actions/cache@v4
         with:
-          path: data/automation.db
-          key: automation-db-${{ github.sha }}-${{ github.run_id }}
+          path: data/channel_1.db
+          key: automation-db-channel_1-${{ github.sha }}-${{ github.run_id }}
           restore-keys: |
-            automation-db-${{ github.sha }}-
-            automation-db-
+            automation-db-channel_1-${{ github.sha }}-
+            automation-db-channel_1-
 
       - name: Restore credentials & tokens
         run: |
@@ -88,26 +87,25 @@ jobs:
         if: always()
         uses: actions/cache/save@v4
         with:
-          path: data/automation.db
-          key: automation-db-${{ github.run_id }}
+          path: data/channel_1.db
+          key: automation-db-channel_1-${{ github.run_id }}
 
       - name: Commit DB to repo
         if: always()
         run: |
-          if [ ! -f data/automation.db ]; then
+          if [ ! -f data/channel_1.db ]; then
             echo "No DB file found — skipping commit"
             exit 0
           fi
-          cp data/automation.db /tmp/automation_new.db
-          git checkout -- data/automation.db
+          cp data/channel_1.db /tmp/channel_1_new.db
           git fetch origin main
           git checkout -B main origin/main
-          cp /tmp/automation_new.db data/automation.db
+          cp /tmp/channel_1_new.db data/channel_1.db
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add -f data/automation.db
+          git add -f data/channel_1.db
           if ! git diff --staged --quiet; then
-            git commit -m "chore: update automation.db [skip ci]"
+            git commit -m "chore: update channel_1.db [skip ci]"
             git push origin main
           else
             echo "No DB changes to commit"

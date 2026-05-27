@@ -30,6 +30,33 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
+      - name: Restore DB cache (channel_1)
+        uses: actions/cache@v4
+        with:
+          path: data/channel_1.db
+          key: automation-db-channel_1-${{ github.sha }}-${{ github.run_id }}
+          restore-keys: |
+            automation-db-channel_1-${{ github.sha }}-
+            automation-db-channel_1-
+
+      - name: Restore DB cache (channel_2)
+        uses: actions/cache@v4
+        with:
+          path: data/channel_2.db
+          key: automation-db-channel_2-${{ github.sha }}-${{ github.run_id }}
+          restore-keys: |
+            automation-db-channel_2-${{ github.sha }}-
+            automation-db-channel_2-
+
+      - name: Restore DB cache (channel_3)
+        uses: actions/cache@v4
+        with:
+          path: data/channel_3.db
+          key: automation-db-channel_3-${{ github.sha }}-${{ github.run_id }}
+          restore-keys: |
+            automation-db-channel_3-${{ github.sha }}-
+            automation-db-channel_3-
+
       - name: Restore credentials & tokens
         run: |
           mkdir -p credentials tokens
@@ -59,13 +86,6 @@ jobs:
 
       - name: Send daily summary
         run: python run.py --summary-only
-
-      - name: Save DB cache
-        if: always()
-        uses: actions/cache/save@v4
-        with:
-          path: data/automation.db
-          key: automation-db-${{ github.run_id }}
 
       - name: Upload logs as artifact
         if: always()
