@@ -104,11 +104,15 @@ def upsert_channel(channel_cfg: Dict[str, Any]) -> None:
 # ── Video state ───────────────────────────────────────────────────────────────
 
 def get_posted_video_ids(channel_id: str) -> set:
-    """Return set of tiktok_video_id values that are already uploaded or permanently failed."""
+    """
+    Returns video IDs that must NOT be selected for a new upload.
+    Includes pending_retry so a video that failed-upload is not re-uploaded
+    as a "new" video — it goes through the retry path instead.
+    """
     conn = get_connection()
     rows = conn.execute("""
         SELECT tiktok_video_id FROM posted_videos
-        WHERE channel_id = ? AND status IN ('uploaded', 'failed_permanent', 'skipped')
+        WHERE channel_id = ? AND status IN ('uploaded', 'failed_permanent', 'skipped', 'pending_retry')
     """, (channel_id,)).fetchall()
     conn.close()
     return {row["tiktok_video_id"] for row in rows}
