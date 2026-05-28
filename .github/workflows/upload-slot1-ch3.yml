@@ -17,6 +17,10 @@ on:
         required: false
         default: "false"
 
+concurrency:
+  group: upload-channel_3
+  cancel-in-progress: false
+
 env:
   DB_PAGE_ID: channel_3
 
