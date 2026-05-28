@@ -104,7 +104,12 @@ jobs:
           git add -f data/channel_1.db
           if ! git diff --staged --quiet; then
             git commit -m "chore: update channel_1.db [skip ci]"
-            git push origin main
+            for i in 1 2 3; do
+              git push origin main && break
+              echo "Push failed (attempt $i/3) -- rebasing and retrying..."
+              git fetch origin main
+              git rebase origin/main
+            done
           else
             echo "No DB changes to commit"
           fi
