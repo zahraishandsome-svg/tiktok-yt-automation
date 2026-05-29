@@ -73,7 +73,7 @@ channels:
     enabled: true
     max_retry_days: 7
     shorts_max_seconds: 180
-    upload_mode: short_only
+    upload_mode: longform_only
     slot_publish_times_utc:
       1: "09:00"   # 2 PM PKT  (UTC+5)
       2: "10:00"   # 3 PM PKT  (UTC+5)
