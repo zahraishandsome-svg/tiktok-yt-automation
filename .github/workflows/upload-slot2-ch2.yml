@@ -99,6 +99,19 @@ jobs:
           path: data/channel_2.db
           key: automation-db-channel_2-${{ github.run_id }}
 
+      - name: Checkpoint DB WAL
+        if: always()
+        run: |
+          if [ -f data/channel_2.db ]; then
+            python -c "
+import sqlite3
+conn = sqlite3.connect('data/channel_2.db')
+result = conn.execute('PRAGMA wal_checkpoint(TRUNCATE)').fetchone()
+print(f'WAL checkpoint: busy={result[0]} log={result[1]} checkpointed={result[2]}')
+conn.close()
+"
+          fi
+
       - name: Commit DB to repo
         if: always()
         run: |
