@@ -45,7 +45,7 @@ jobs:
 
       - name: Install ffmpeg
         run: |
-          sudo apt-get install -y --no-install-recommends ffmpeg
+          sudo apt-get install -y --no-install-recommends --fix-missing ffmpeg || true
           ffmpeg -version | head -1
           ffprobe -version | head -1
 
