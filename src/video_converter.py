@@ -32,6 +32,48 @@ def is_ffmpeg_available() -> bool:
     return shutil.which("ffmpeg") is not None
 
 
+def get_video_dimensions(path: Path) -> tuple:
+    """
+    Return (width, height) of a video file using ffprobe.
+    Returns (0, 0) on error.
+
+    Used to reliably determine orientation AFTER download, since yt-dlp's
+    extract_flat mode often omits width/height from profile metadata.
+    """
+    if not shutil.which("ffprobe"):
+        logger.warning("[converter] ffprobe not on PATH — cannot probe dimensions")
+        return (0, 0)
+    try:
+        result = subprocess.run(
+            [
+                "ffprobe", "-v", "error",
+                "-select_streams", "v:0",
+                "-show_entries", "stream=width,height",
+                "-of", "csv=p=0",
+                str(path),
+            ],
+            capture_output=True, text=True, timeout=30,
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            parts = result.stdout.strip().split(",")
+            if len(parts) >= 2:
+                return (int(parts[0]), int(parts[1]))
+    except Exception as exc:
+        logger.warning("[converter] ffprobe error for %s: %s", path.name, exc)
+    return (0, 0)
+
+
+def is_vertical(path: Path) -> bool:
+    """
+    Return True if the video is portrait/vertical (height > width).
+    Falls back to False on probe failure (safe default — skips conversion rather than crashing).
+    """
+    w, h = get_video_dimensions(path)
+    result = h > w
+    logger.debug("[converter] %s dimensions: %dx%d  vertical=%s", path.name, w, h, result)
+    return result
+
+
 def convert_to_4_3_blurred(
     input_path: Path,
     output_path: Path,

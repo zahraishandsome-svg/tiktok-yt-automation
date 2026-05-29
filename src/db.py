@@ -267,23 +267,42 @@ def record_video_seen(channel_id: str, video: Dict[str, Any],
 
 
 def mark_uploaded(channel_id: str, tiktok_video_id: str, youtube_video_id: str,
-                  format_type: str = "short") -> None:
+                  format_type: str = "short",
+                  tiktok_url: str = None, tiktok_title: str = None,
+                  tiktok_timestamp: int = None) -> None:
     """
-    Mark a specific (channel, video, format) triple as uploaded.
+    Upsert a (channel, video, format) triple as uploaded.
+
+    Uses INSERT … ON CONFLICT DO UPDATE so it works whether or not
+    record_video_seen() was previously called with the same format_type.
+    This is critical for longform_only/dual modes where the 'longform' row
+    may not have been pre-inserted by record_video_seen().
+
     format_type defaults to 'short' (legacy behaviour).
     """
     now = datetime.utcnow().isoformat()
     conn = get_connection()
     with conn:
         conn.execute("""
-            UPDATE posted_videos
-            SET status = 'uploaded', youtube_video_id = ?, posted_at = ?,
-                retry_count = 0, next_retry_date = NULL, error_message = NULL,
-                updated_at = ?
-            WHERE channel_id = ? AND tiktok_video_id = ? AND format_type = ?
+            INSERT INTO posted_videos
+                (channel_id, tiktok_video_id, format_type,
+                 tiktok_url, tiktok_title, tiktok_timestamp,
+                 youtube_video_id, posted_at, status,
+                 retry_count, next_retry_date, error_message,
+                 created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'uploaded', 0, NULL, NULL, ?, ?)
+            ON CONFLICT(channel_id, tiktok_video_id, format_type) DO UPDATE SET
+                status          = 'uploaded',
+                youtube_video_id = excluded.youtube_video_id,
+                posted_at        = excluded.posted_at,
+                retry_count      = 0,
+                next_retry_date  = NULL,
+                error_message    = NULL,
+                updated_at       = excluded.updated_at
         """, (
-            youtube_video_id, now, now,
             channel_id, tiktok_video_id, format_type,
+            tiktok_url, tiktok_title, tiktok_timestamp,
+            youtube_video_id, now, now, now,
         ))
     conn.close()
 

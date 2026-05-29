@@ -29,7 +29,7 @@ from .tiktok_downloader import (
     is_short_video, cleanup_download, cleanup_stale_downloads, _PROFILE_BATCH,
 )
 from .youtube_uploader import get_authenticated_client, upload_video
-from .video_converter import convert_to_4_3_blurred, is_ffmpeg_available
+from .video_converter import convert_to_4_3_blurred, is_ffmpeg_available, is_vertical as _file_is_vertical
 
 logger = logging.getLogger(__name__)
 
@@ -89,14 +89,13 @@ def run_channel(channel: Dict[str, Any], slot: int, dry_run: bool = False) -> Di
 
         logger.info("[%s] Selected video: %s | '%s'", channel_id, video["id"], video.get("title", ""))
 
-        # Determine orientation
-        vertical = (video.get("height") or 0) > (video.get("width") or 0)
-
-        # Dispatch to mode-specific runner
+        # Dispatch to mode-specific runner.
+        # NOTE: vertical orientation is determined AFTER download (from the actual
+        # file via ffprobe) because extract_flat metadata often omits width/height.
         if upload_mode == "dual":
-            _run_dual(channel, video, slot, run_id, vertical, dry_run, result)
+            _run_dual(channel, video, slot, run_id, dry_run, result)
         elif upload_mode == "longform_only":
-            _run_longform_only(channel, video, slot, run_id, vertical, dry_run, result)
+            _run_longform_only(channel, video, slot, run_id, dry_run, result)
         else:
             # short_only (default) — original behaviour
             _run_short_only(channel, video, slot, run_id, dry_run, result)
@@ -151,7 +150,9 @@ def _run_short_only(channel, video, slot, run_id, dry_run, result):
 
     if youtube_id:
         if not dry_run:
-            db.mark_uploaded(channel_id, video["id"], youtube_id, format_type="short")
+            db.mark_uploaded(channel_id, video["id"], youtube_id, format_type="short",
+                             tiktok_url=video.get("url"), tiktok_title=video.get("title"),
+                             tiktok_timestamp=video.get("timestamp"))
             db.finish_run(run_id, "success", videos_uploaded=1)
         else:
             db.finish_run(run_id, "dry_run", videos_uploaded=0)
@@ -171,10 +172,12 @@ def _run_short_only(channel, video, slot, run_id, dry_run, result):
         result["error"] = "Upload returned no video ID"
 
 
-def _run_longform_only(channel, video, slot, run_id, vertical, dry_run, result):
+def _run_longform_only(channel, video, slot, run_id, dry_run, result):
     """
     Upload ONLY the 4:3 blurred-fill version.
     Horizontal videos are uploaded as-is (no conversion needed).
+    Orientation is probed from the downloaded file (not from TikTok metadata,
+    which is often missing width/height in extract_flat mode).
     """
     channel_id = channel["id"]
 
@@ -186,6 +189,13 @@ def _run_longform_only(channel, video, slot, run_id, vertical, dry_run, result):
         result["status"] = "failed"
         result["error"] = "Download failed"
         return
+
+    # Probe orientation from the actual file (reliable even when metadata is absent)
+    vertical = _file_is_vertical(local_file) if not dry_run else (
+        (video.get("height") or 0) > (video.get("width") or 0)
+    )
+    logger.info("[%s] Video orientation: %s", channel_id,
+                "vertical (will convert to 4:3)" if vertical else "horizontal (upload as-is)")
 
     # Convert vertical → 4:3 blurred-fill; horizontal passes through unchanged
     upload_file = local_file
@@ -214,7 +224,9 @@ def _run_longform_only(channel, video, slot, run_id, vertical, dry_run, result):
 
     if youtube_id:
         if not dry_run:
-            db.mark_uploaded(channel_id, video["id"], youtube_id, format_type="longform")
+            db.mark_uploaded(channel_id, video["id"], youtube_id, format_type="longform",
+                             tiktok_url=video.get("url"), tiktok_title=video.get("title"),
+                             tiktok_timestamp=video.get("timestamp"))
             db.finish_run(run_id, "success", videos_uploaded=1)
         else:
             db.finish_run(run_id, "dry_run", videos_uploaded=0)
@@ -233,10 +245,11 @@ def _run_longform_only(channel, video, slot, run_id, vertical, dry_run, result):
         result["error"] = "Upload returned no video ID"
 
 
-def _run_dual(channel, video, slot, run_id, vertical, dry_run, result):
+def _run_dual(channel, video, slot, run_id, dry_run, result):
     """
     Upload BOTH the original Short (9:16) AND the 4:3 blurred-fill longform.
     Horizontal videos are uploaded once and marked done for both formats.
+    Orientation is probed from the downloaded file (reliable vs. extract_flat metadata).
     """
     channel_id = channel["id"]
 
@@ -268,6 +281,13 @@ def _run_dual(channel, video, slot, run_id, vertical, dry_run, result):
         result["error"] = "Download failed"
         return
 
+    # Probe orientation from the actual file
+    vertical = _file_is_vertical(local_file) if not dry_run else (
+        (video.get("height") or 0) > (video.get("width") or 0)
+    )
+    logger.info("[%s] Video orientation: %s", channel_id,
+                "vertical" if vertical else "horizontal (upload once, mark both formats done)")
+
     videos_uploaded = 0
     short_yt_id = None
     longform_yt_id = None
@@ -288,7 +308,9 @@ def _run_dual(channel, video, slot, run_id, vertical, dry_run, result):
                                      is_short=short_is_short, slot=slot, dry_run=dry_run)
         if short_yt_id:
             if not dry_run:
-                db.mark_uploaded(channel_id, video["id"], short_yt_id, format_type="short")
+                db.mark_uploaded(channel_id, video["id"], short_yt_id, format_type="short",
+                                 tiktok_url=video.get("url"), tiktok_title=video.get("title"),
+                                 tiktok_timestamp=video.get("timestamp"))
             videos_uploaded += 1
             result["youtube_url"] = f"https://www.youtube.com/watch?v={short_yt_id}"
             logger.info("[%s] Short uploaded: %s", channel_id, result["youtube_url"])
@@ -321,10 +343,14 @@ def _run_dual(channel, video, slot, run_id, vertical, dry_run, result):
             )
             if longform_yt_id:
                 if not dry_run:
-                    db.mark_uploaded(channel_id, video["id"], longform_yt_id, format_type="longform")
+                    db.mark_uploaded(channel_id, video["id"], longform_yt_id, format_type="longform",
+                                     tiktok_url=video.get("url"), tiktok_title=video.get("title"),
+                                     tiktok_timestamp=video.get("timestamp"))
                     if not vertical:
                         # Horizontal: also mark short as done (same upload serves both)
-                        db.mark_uploaded(channel_id, video["id"], longform_yt_id, format_type="short")
+                        db.mark_uploaded(channel_id, video["id"], longform_yt_id, format_type="short",
+                                         tiktok_url=video.get("url"), tiktok_title=video.get("title"),
+                                         tiktok_timestamp=video.get("timestamp"))
                 videos_uploaded += 1
                 result["youtube_url_longform"] = f"https://www.youtube.com/watch?v={longform_yt_id}"
                 logger.info("[%s] Longform uploaded: %s", channel_id, result["youtube_url_longform"])
@@ -473,8 +499,13 @@ def _pick_next_video(channel: Dict[str, Any], slot: int,
         return None
 
     for video in eligible:
-        # Record it in DB so we can track it even if download fails
-        db.record_video_seen(channel_id, video, format_type="short")
+        # Record it in DB so we can track it even if download fails.
+        # Use format_type matching the mode so get_posted_video_ids() can find it.
+        # dual:         create the 'short' row (the 'longform' row is created by mark_uploaded upsert)
+        # longform_only: create the 'longform' row directly
+        # short_only:   create the 'short' row (legacy, unchanged)
+        seen_format = "longform" if upload_mode == "longform_only" else "short"
+        db.record_video_seen(channel_id, video, format_type=seen_format)
         return video
 
     return None
