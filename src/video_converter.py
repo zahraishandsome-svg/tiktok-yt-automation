@@ -34,32 +34,58 @@ def is_ffmpeg_available() -> bool:
 
 def get_video_dimensions(path: Path) -> tuple:
     """
-    Return (width, height) of a video file using ffprobe.
+    Return (width, height) of a video file.
     Returns (0, 0) on error.
+
+    Tries ffprobe first (fastest). Falls back to parsing ffmpeg -i stderr
+    (ffprobe and ffmpeg ship together but PATH may differ on some systems).
 
     Used to reliably determine orientation AFTER download, since yt-dlp's
     extract_flat mode often omits width/height from profile metadata.
     """
-    if not shutil.which("ffprobe"):
-        logger.warning("[converter] ffprobe not on PATH — cannot probe dimensions")
-        return (0, 0)
-    try:
-        result = subprocess.run(
-            [
-                "ffprobe", "-v", "error",
-                "-select_streams", "v:0",
-                "-show_entries", "stream=width,height",
-                "-of", "csv=p=0",
-                str(path),
-            ],
-            capture_output=True, text=True, timeout=30,
-        )
-        if result.returncode == 0 and result.stdout.strip():
-            parts = result.stdout.strip().split(",")
-            if len(parts) >= 2:
-                return (int(parts[0]), int(parts[1]))
-    except Exception as exc:
-        logger.warning("[converter] ffprobe error for %s: %s", path.name, exc)
+    # ── Method 1: ffprobe ────────────────────────────────────────────────────
+    ffprobe = shutil.which("ffprobe")
+    if ffprobe:
+        try:
+            result = subprocess.run(
+                [
+                    ffprobe, "-v", "error",
+                    "-select_streams", "v:0",
+                    "-show_entries", "stream=width,height",
+                    "-of", "csv=p=0",
+                    str(path),
+                ],
+                capture_output=True, text=True, timeout=30,
+            )
+            if result.returncode == 0 and result.stdout.strip():
+                parts = result.stdout.strip().split(",")
+                if len(parts) >= 2:
+                    return (int(parts[0]), int(parts[1]))
+        except Exception as exc:
+            logger.debug("[converter] ffprobe error: %s", exc)
+
+    # ── Method 2: ffmpeg -i (parses stderr for "NxM" in video stream line) ──
+    ffmpeg = shutil.which("ffmpeg")
+    if ffmpeg:
+        try:
+            import re
+            result = subprocess.run(
+                [ffmpeg, "-i", str(path)],
+                capture_output=True, text=True, timeout=30,
+            )
+            # ffmpeg always prints codec info to stderr even on error
+            for line in (result.stdout + result.stderr).splitlines():
+                if "Video:" in line:
+                    m = re.search(r"(\d{2,5})x(\d{2,5})", line)
+                    if m:
+                        return (int(m.group(1)), int(m.group(2)))
+        except Exception as exc:
+            logger.debug("[converter] ffmpeg -i dimension parse error: %s", exc)
+
+    logger.warning(
+        "[converter] Could not probe dimensions of %s — assuming horizontal",
+        path.name,
+    )
     return (0, 0)
 
 
