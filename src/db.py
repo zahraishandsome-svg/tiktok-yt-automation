@@ -185,10 +185,12 @@ def get_posted_video_ids(channel_id: str, upload_mode: str = "short_only") -> se
     """
     conn = get_connection()
 
-    if upload_mode in ("longform_only", "dual"):
+    if upload_mode in ("longform_only", "dual", "split"):
         # Exclude a video if it has ANY done-status row in ANY format.
         # This prevents re-uploading a video that was previously posted as a
         # Short (short_only) and the channel later switched to longform_only/dual.
+        # "split" uses the same cross-format exclusion so slot 1 and slot 2 always
+        # pick different TikTok videos (one short, one longform per day).
         rows = conn.execute("""
             SELECT DISTINCT tiktok_video_id FROM posted_videos
             WHERE channel_id = ?

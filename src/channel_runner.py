@@ -9,6 +9,9 @@ Upload modes (set via upload_mode in channels.yaml):
   dual         — same TikTok source → Short upload + 4:3 blurred-fill longform upload.
                  Both happen in a single slot run. Counts as 2 videos_uploaded.
   longform_only — source converted to 4:3 blurred-fill, uploaded as a regular (non-Short) video.
+  split        — slot 1 picks a fresh TikTok and uploads it as a Short (9:16).
+                 slot 2 picks a DIFFERENT TikTok and uploads it as a 4:3 longform.
+                 Cross-format exclusion: a video uploaded in either format is never re-used.
 
 Horizontal source videos (width >= height) are NEVER converted:
   - short_only:    upload as regular (non-Short) video — unchanged
@@ -36,7 +39,7 @@ logger = logging.getLogger(__name__)
 PROJECT_ROOT = Path(__file__).parent.parent
 DOWNLOADS_DIR = PROJECT_ROOT / "downloads"
 
-VALID_UPLOAD_MODES = {"short_only", "dual", "longform_only"}
+VALID_UPLOAD_MODES = {"short_only", "dual", "longform_only", "split"}
 
 
 class TikTokUnreachableError(Exception):
@@ -96,6 +99,13 @@ def run_channel(channel: Dict[str, Any], slot: int, dry_run: bool = False) -> Di
             _run_dual(channel, video, slot, run_id, dry_run, result)
         elif upload_mode == "longform_only":
             _run_longform_only(channel, video, slot, run_id, dry_run, result)
+        elif upload_mode == "split":
+            # Slot 1 → Short (9:16); Slot 2 → Longform (4:3 blurred-fill).
+            # Each slot picks a completely different TikTok video.
+            if slot == 2:
+                _run_longform_only(channel, video, slot, run_id, dry_run, result)
+            else:
+                _run_short_only(channel, video, slot, run_id, dry_run, result)
         else:
             # short_only (default) — original behaviour
             _run_short_only(channel, video, slot, run_id, dry_run, result)
@@ -500,11 +510,18 @@ def _pick_next_video(channel: Dict[str, Any], slot: int,
 
     for video in eligible:
         # Record it in DB so we can track it even if download fails.
-        # Use format_type matching the mode so get_posted_video_ids() can find it.
+        # Use format_type matching what this slot will actually upload so
+        # get_posted_video_ids() correctly excludes it on the next run.
         # dual:         create the 'short' row (the 'longform' row is created by mark_uploaded upsert)
         # longform_only: create the 'longform' row directly
         # short_only:   create the 'short' row (legacy, unchanged)
-        seen_format = "longform" if upload_mode == "longform_only" else "short"
+        # split:        slot 1 → 'short'; slot 2 → 'longform'
+        if upload_mode == "longform_only":
+            seen_format = "longform"
+        elif upload_mode == "split":
+            seen_format = "longform" if slot == 2 else "short"
+        else:
+            seen_format = "short"
         db.record_video_seen(channel_id, video, format_type=seen_format)
         return video
 

@@ -29,7 +29,10 @@
 #                           longform_only Upload ONLY the 4:3 blurred-fill version (no Short).
 #                                         Requires ffmpeg for vertical source videos.
 #   longform_title_suffix Optional text appended to the title for longform (4:3) uploads.
-#                         E.g. " | Full Video". Only used in dual/longform_only modes.
+#                         E.g. " | Full Video". Only used in dual/longform_only/split modes.
+#                           split         Slot 1 uploads a fresh TikTok as Short (9:16).
+#                                         Slot 2 uploads a completely different TikTok as 4:3 longform.
+#                                         Cross-format exclusion: same video is never re-used across slots.
 # ────────────────────────────────────────────────────────────────────────────
 
 channels:
@@ -73,7 +76,7 @@ channels:
     enabled: true
     max_retry_days: 7
     shorts_max_seconds: 180
-    upload_mode: longform_only
+    upload_mode: split           # slot 1 (2PM PKT) = fresh Short; slot 2 (3PM PKT) = fresh Longform (different TikTok)
     slot_publish_times_utc:
       1: "09:00"   # 2 PM PKT  (UTC+5)
       2: "10:00"   # 3 PM PKT  (UTC+5)
