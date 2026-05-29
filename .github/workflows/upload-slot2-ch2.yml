@@ -43,6 +43,12 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
+      - name: Install ffmpeg
+        run: |
+          sudo apt-get install -y --no-install-recommends ffmpeg
+          ffmpeg -version | head -1
+          ffprobe -version | head -1
+
       - name: Restore DB cache
         uses: actions/cache@v4
         with:
