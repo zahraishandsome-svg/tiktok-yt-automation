@@ -103,13 +103,7 @@ jobs:
         if: always()
         run: |
           if [ -f data/channel_2.db ]; then
-            python -c "
-import sqlite3
-conn = sqlite3.connect('data/channel_2.db')
-result = conn.execute('PRAGMA wal_checkpoint(TRUNCATE)').fetchone()
-print(f'WAL checkpoint: busy={result[0]} log={result[1]} checkpointed={result[2]}')
-conn.close()
-"
+            python -c "import sqlite3; c=sqlite3.connect('data/channel_2.db'); r=c.execute('PRAGMA wal_checkpoint(TRUNCATE)').fetchone(); print('WAL checkpoint:', r); c.close()"
           fi
 
       - name: Commit DB to repo
