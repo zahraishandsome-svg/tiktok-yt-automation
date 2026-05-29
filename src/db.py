@@ -173,10 +173,11 @@ def get_posted_video_ids(channel_id: str, upload_mode: str = "short_only") -> se
     Returns video IDs that must NOT be selected for a new upload.
 
     upload_mode determines which format(s) must be "done" for a video to be skipped:
-      short_only   — skip if format_type='short' has a done-status
-      longform_only — skip if format_type='longform' has a done-status
-      dual         — skip if ANY format has a done-status (partial or fully done);
-                     the retry path handles finishing partial uploads
+      short_only    — skip if format_type='short' has a done-status (legacy, unchanged)
+      longform_only — skip if ANY format has a done-status. This means videos already
+                      uploaded as Shorts (short_only mode) are not re-uploaded when the
+                      channel switches to longform_only.
+      dual          — same as longform_only: skip if ANY format has a done-status.
 
     Done-statuses: uploaded | failed_permanent | skipped | pending_retry
     ('pending_retry' is included so failed videos go through the retry path,
@@ -184,17 +185,10 @@ def get_posted_video_ids(channel_id: str, upload_mode: str = "short_only") -> se
     """
     conn = get_connection()
 
-    if upload_mode == "longform_only":
-        rows = conn.execute("""
-            SELECT tiktok_video_id FROM posted_videos
-            WHERE channel_id = ? AND format_type = 'longform'
-              AND status IN ('uploaded', 'failed_permanent', 'skipped', 'pending_retry')
-        """, (channel_id,)).fetchall()
-
-    elif upload_mode == "dual":
-        # A video is "handled" once either format has been started.
-        # If short succeeded but longform failed → pending_retry row exists →
-        # this video is excluded from "new" selection and picked up by retry path.
+    if upload_mode in ("longform_only", "dual"):
+        # Exclude a video if it has ANY done-status row in ANY format.
+        # This prevents re-uploading a video that was previously posted as a
+        # Short (short_only) and the channel later switched to longform_only/dual.
         rows = conn.execute("""
             SELECT DISTINCT tiktok_video_id FROM posted_videos
             WHERE channel_id = ?
