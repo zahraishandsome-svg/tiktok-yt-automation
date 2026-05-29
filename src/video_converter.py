@@ -23,8 +23,8 @@ logger = logging.getLogger(__name__)
 OUT_W = 1440
 OUT_H = 1080
 
-# Default Gaussian blur strength (approved by operator 2026-05-29)
-DEFAULT_SIGMA = 25
+# Default Gaussian blur strength (approved by operator 2026-05-29, increased to 40 on 2026-05-29)
+DEFAULT_SIGMA = 40
 
 
 def is_ffmpeg_available() -> bool:
