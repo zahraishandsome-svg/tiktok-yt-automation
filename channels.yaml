@@ -21,6 +21,15 @@
 #   min_backlog_for_slot1 Optional int. Slot 1 is skipped unless this many unuploaded
 #                         eligible videos exist. Use with min_upload_date to drop to 1/day
 #                         automatically once the backlog runs out.
+#   upload_mode           Controls what gets uploaded per slot (default: short_only).
+#                           short_only    Original 9:16 as Short (or regular if long/horizontal).
+#                                         Existing behaviour — all current channels use this.
+#                           dual          Upload Short + 4:3 blurred-fill longform from same source.
+#                                         Counts as 2 uploads per slot. Requires ffmpeg.
+#                           longform_only Upload ONLY the 4:3 blurred-fill version (no Short).
+#                                         Requires ffmpeg for vertical source videos.
+#   longform_title_suffix Optional text appended to the title for longform (4:3) uploads.
+#                         E.g. " | Full Video". Only used in dual/longform_only modes.
 # ────────────────────────────────────────────────────────────────────────────
 
 channels:
@@ -41,6 +50,8 @@ channels:
     enabled: true
     max_retry_days: 7
     shorts_max_seconds: 180
+    upload_mode: short_only        # default — change to dual or longform_only when ready
+    # longform_title_suffix: ""    # uncomment + set if using dual/longform_only
     # Scheduled publishing: video uploads as Private, goes Public at exact UTC time.
     # GitHub Actions delays never affect when viewers see the video.
     slot_publish_times_utc:
@@ -62,6 +73,7 @@ channels:
     enabled: true
     max_retry_days: 7
     shorts_max_seconds: 180
+    upload_mode: short_only
     slot_publish_times_utc:
       1: "09:00"   # 2 PM PKT  (UTC+5)
       2: "10:00"   # 3 PM PKT  (UTC+5)
@@ -81,6 +93,7 @@ channels:
     enabled: true
     max_retry_days: 7
     shorts_max_seconds: 180
+    upload_mode: short_only
     # Monetised channel: only upload 2026+ content
     min_upload_date: "2026-01-01"
     # Drop to 1 upload/day (slot 2 only) once fewer than 2 unuploaded videos remain
