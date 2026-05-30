@@ -96,7 +96,7 @@ channels:
     enabled: true
     max_retry_days: 7
     shorts_max_seconds: 180
-    upload_mode: short_only
+    upload_mode: split            # slot 1 (2PM PKT) = fresh Short; slot 2 (3PM PKT) = fresh Longform (different TikTok)
     # Monetised channel: only upload 2026+ content
     min_upload_date: "2026-01-01"
     # Drop to 1 upload/day (slot 2 only) once fewer than 2 unuploaded videos remain
