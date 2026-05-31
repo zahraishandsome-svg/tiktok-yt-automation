@@ -129,8 +129,8 @@ def seed(channel_cfg: dict) -> None:
     youtube = _get_seed_client(creds_file, token_file)
     yt_titles = fetch_youtube_titles(youtube)
 
-    print(f"Fetching TikTok profile: @{tiktok_user}...")
-    tiktok_videos = get_profile_videos(tiktok_user)
+    print(f"Fetching TikTok profile: @{tiktok_user} (full profile)...")
+    tiktok_videos = get_profile_videos(tiktok_user, end=None)
     if tiktok_videos is None:
         print(f"ERROR: Could not fetch TikTok profile @{tiktok_user} — network error or profile unreachable")
         sys.exit(1)
