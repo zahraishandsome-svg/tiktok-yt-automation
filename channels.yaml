@@ -96,11 +96,13 @@ channels:
     enabled: true
     max_retry_days: 7
     shorts_max_seconds: 180
-    upload_mode: short_only
-    # Monetised channel: only upload 2026+ content
+    upload_mode: tiered_split
+    # Slot 1 (Short): only upload 2026+ content as Shorts
     min_upload_date: "2026-01-01"
-    # Drop to 1 upload/day (slot 2 only) once fewer than 2 unuploaded videos remain
+    # Drop slot 1 (Short) when backlog falls below 2 unposted 2026+ videos
     min_backlog_for_slot1: 2
+    # Slot 2 (Longform): pick videos at least this many days old
+    longform_min_age_days: 15
     slot_publish_times_utc:
       1: "09:00"   # 2 PM PKT  (UTC+5)
       2: "10:00"   # 3 PM PKT  (UTC+5)
