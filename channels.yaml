@@ -99,8 +99,10 @@ channels:
     upload_mode: tiered_split
     # Slot 1 (Short): only upload 2026+ content as Shorts
     min_upload_date: "2026-01-01"
-    # Drop slot 1 (Short) when backlog falls below 2 unposted 2026+ videos
-    min_backlog_for_slot1: 2
+    # Post a Short whenever at least 1 fresh 2026+ video exists. (In tiered_split the
+    # Longform slot pulls from OLD videos ≥15d, so there's no need to reserve fresh
+    # ones for it — hoarding just left fresh clips unposted. Lowered 2→1 on 2026-06-03.)
+    min_backlog_for_slot1: 1
     # Slot 2 (Longform): pick videos at least this many days old
     longform_min_age_days: 15
     slot_publish_times_utc:
