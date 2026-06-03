@@ -105,6 +105,12 @@ channels:
     min_backlog_for_slot1: 1
     # Slot 2 (Longform): pick videos at least this many days old
     longform_min_age_days: 15
+    # Slot 2 (Longform): only post clips ≥60s; shorter ones are skipped (marked so they
+    # are never re-tried) and the slot moves to the next candidate.
+    longform_min_seconds: 60
+    # Download budget per run — high enough to skip past several short clips to find a
+    # 60s+ one. Short clips get marked skipped, so future runs converge quickly.
+    max_download_candidates: 8
     slot_publish_times_utc:
       1: "09:00"   # 2 PM PKT  (UTC+5)
       2: "10:00"   # 3 PM PKT  (UTC+5)
