@@ -36,31 +36,6 @@
 # ────────────────────────────────────────────────────────────────────────────
 
 channels:
-  - id: channel_1
-    tiktok_username: "ravenn.grwm"
-    youtube_channel_name: "Raven GRWM Haul"
-    google_credentials_file: "credentials/channel_1_client_secret.json"
-    oauth_token_file: "tokens/channel_1_token.json"
-    videos_per_day: 2
-    description_footer: ""
-    default_tags:
-      - grwm
-      - getreadywithme
-      - haul
-      - fashion
-      - ootd
-    youtube_category_id: "22"
-    enabled: true
-    max_retry_days: 7
-    shorts_max_seconds: 180
-    upload_mode: short_only        # default — change to dual or longform_only when ready
-    # longform_title_suffix: ""    # uncomment + set if using dual/longform_only
-    # Scheduled publishing: video uploads as Private, goes Public at exact UTC time.
-    # GitHub Actions delays never affect when viewers see the video.
-    slot_publish_times_utc:
-      1: "15:00"   # 8 PM PKT  (UTC+5)
-      2: "17:00"   # 10 PM PKT (UTC+5)
-
   - id: channel_2
     tiktok_username: "miraikun0515.dayo"
     youtube_channel_name: "miraikun.dayo1"
