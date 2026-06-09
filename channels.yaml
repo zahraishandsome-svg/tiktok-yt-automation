@@ -51,7 +51,13 @@ channels:
     enabled: true
     max_retry_days: 7
     shorts_max_seconds: 180
-    upload_mode: split           # slot 1 (2PM PKT) = fresh Short; slot 2 (3PM PKT) = fresh Longform (different TikTok)
+    upload_mode: tiered_split
+    # Slot 1 (Short) = fresh newest TikTok. Slot 2 (Longform) = a video ≥15 days old
+    # (may reuse an old short as a 4:3 longform, but NEVER the same-day video).
+    min_backlog_for_slot1: 1
+    longform_min_age_days: 15
+    longform_min_seconds: 60
+    max_download_candidates: 8
     slot_publish_times_utc:
       1: "09:00"   # 2 PM PKT  (UTC+5)
       2: "10:00"   # 3 PM PKT  (UTC+5)
