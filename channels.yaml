@@ -36,31 +36,8 @@
 # ────────────────────────────────────────────────────────────────────────────
 
 channels:
-  - id: channel_2
-    tiktok_username: "miraikun0515.dayo"
-    youtube_channel_name: "miraikun.dayo1"
-    google_credentials_file: "credentials/channel_2_client_secret.json"
-    oauth_token_file: "tokens/channel_2_token.json"
-    videos_per_day: 2
-    description_footer: ""
-    default_tags:
-      - miraikun
-      - japanese
-      - viral
-    youtube_category_id: "22"
-    enabled: true
-    max_retry_days: 7
-    shorts_max_seconds: 180
-    upload_mode: tiered_split
-    # Slot 1 (Short) = fresh newest TikTok. Slot 2 (Longform) = a video ≥15 days old
-    # (may reuse an old short as a 4:3 longform, but NEVER the same-day video).
-    min_backlog_for_slot1: 1
-    longform_min_age_days: 15
-    longform_min_seconds: 60
-    max_download_candidates: 8
-    slot_publish_times_utc:
-      1: "09:00"   # 2 PM PKT  (UTC+5)
-      2: "10:00"   # 3 PM PKT  (UTC+5)
+  # channel_2 (miraikun.dayo1 / @miraikun0515.dayo) REMOVED 2026-07-20 — decommissioned
+  # after persistent YouTube API 403 "Access forbidden" on every upload.
 
   - id: channel_3
     tiktok_username: "__muk"
