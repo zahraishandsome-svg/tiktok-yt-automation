@@ -70,5 +70,5 @@ channels:
     # 60s+ one. Short clips get marked skipped, so future runs converge quickly.
     max_download_candidates: 8
     slot_publish_times_utc:
-      1: "09:00"   # 2 PM PKT  (UTC+5)
-      2: "10:00"   # 3 PM PKT  (UTC+5)
+      1: "09:00"   # PUBLIC at 6 PM JST
+      2: "11:00"   # PUBLIC at 8 PM JST
