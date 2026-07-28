@@ -42,6 +42,8 @@ channels:
   - id: channel_3
     tiktok_username: "__muk"
     youtube_channel_name: "今日のむくぞ"
+    # The Google account that owns this YouTube channel (supplied by the user).
+    owner_email: "zahidlateefjapan@gmail.com"
     google_credentials_file: "credentials/channel_3_client_secret.json"
     oauth_token_file: "tokens/channel_3_token.json"
     videos_per_day: 2
