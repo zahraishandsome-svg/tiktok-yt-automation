@@ -26,6 +26,12 @@
 #                         publishes it; nothing is auto-scheduled.
 #   skip_slots            Optional list of slot numbers that must never upload, e.g. [1].
 #                         Guards against the slot's workflow/cron still firing.
+#                         A channel with slot 1 skipped counts as Longform-only: no
+#                         minimum video age, and a video is only skipped if it was
+#                         already uploaded as Longform (a past Short is fine).
+#   longform_min_age_days Minimum TikTok age before a video may be posted as Longform.
+#                         Default 15 on channels that also post Shorts, 0 on
+#                         Longform-only channels. Set it explicitly to override.
 #   upload_mode           Controls what gets uploaded per slot (default: short_only).
 #                           short_only    Original 9:16 as Short (or regular if long/horizontal).
 #                                         Existing behaviour — all current channels use this.
@@ -76,8 +82,10 @@ channels:
     # Longform slot pulls from OLD videos ≥15d, so there's no need to reserve fresh
     # ones for it — hoarding just left fresh clips unposted. Lowered 2→1 on 2026-06-03.)
     min_backlog_for_slot1: 1
-    # Slot 2 (Longform): pick videos at least this many days old
-    longform_min_age_days: 15
+    # No longform_min_age_days here on purpose. This is a Longform-only channel
+    # (skip_slots: [1]), so the 15-day wait is off — any video can go up as
+    # Longform however new, as long as it has not been uploaded as Longform
+    # before. (Owner, 18 Sep 2026.)
     # Slot 2 (Longform): only post clips ≥60s; shorter ones are skipped (marked so they
     # are never re-tried) and the slot moves to the next candidate.
     longform_min_seconds: 60

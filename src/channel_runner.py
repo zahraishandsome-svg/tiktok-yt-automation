@@ -786,9 +786,14 @@ def _pick_next_video(channel: Dict[str, Any], slot: int,
     if not raw_batch:
         return None
 
-    already_posted = db.get_posted_video_ids(
-        channel_id, upload_mode=upload_mode,
-        allow_repost_other_format=channel.get("allow_repost_other_format", False))
+    # Longform-only channels: the only disqualifier is a previous LONGFORM upload
+    # of the same video (owner, 18 Sep 2026). Everyone else keeps one-upload-per-video.
+    if _is_longform_only_channel(channel):
+        already_posted = db.get_longformed_video_ids(channel_id)
+    else:
+        already_posted = db.get_posted_video_ids(
+            channel_id, upload_mode=upload_mode,
+            allow_repost_other_format=channel.get("allow_repost_other_format", False))
 
     def _filter(vids):
         if min_ts is not None:
@@ -851,14 +856,35 @@ def _pick_next_video(channel: Dict[str, Any], slot: int,
     return None
 
 
+def _is_longform_only_channel(channel: Dict[str, Any]) -> bool:
+    """
+    True when a channel posts nothing but Longform — either upload_mode is
+    longform_only, or its Short slot (1) is switched off in skip_slots.
+
+    Two rules apply only to these channels (owner, 18 Sep 2026):
+      - No minimum age. Any TikTok video may go up as Longform, however new.
+      - The only thing that disqualifies a video is having ALREADY been uploaded
+        as Longform to this channel. A video that once went out as a Short is
+        still eligible, because the channel no longer posts Shorts at all.
+    Channels that still post Shorts are untouched: 15-day minimum age and one
+    upload per video in any format.
+    """
+    mode = channel.get("upload_mode", "short_only")
+    skip = {int(x) for x in (channel.get("skip_slots") or [])}
+    if mode == "longform_only":
+        return True
+    return mode in ("tiered_split", "split") and 1 in skip
+
+
 def _pick_tiered_split_longform(channel: Dict[str, Any],
                                 exclude_ids: Optional[set] = None) -> Optional[Dict[str, Any]]:
     """
     Video picker for tiered_split slot 2 (Longform).
 
     Selects the newest TikTok video that:
-      - Is at least `longform_min_age_days` old (default 15) — avoids very recent content
-        already handled by slot 1 as Shorts.
+      - Is at least `longform_min_age_days` old — default 15 on channels that also
+        post Shorts (keeps slot 2 off slot 1's fresh content), and 0 on
+        Longform-only channels, where any video may go up however new.
       - Has NOT already been uploaded as longform for this channel.
       - Has NOT been uploaded in ANY format (set allow_repost_other_format: true
         on the channel to allow re-posting old Shorts as longform, which is how
@@ -870,7 +896,10 @@ def _pick_tiered_split_longform(channel: Dict[str, Any],
     """
     channel_id = channel["id"]
     tiktok_user = channel["tiktok_username"]
-    min_age_days = int(channel.get("longform_min_age_days", 15))
+    longform_only = _is_longform_only_channel(channel)
+    # A Longform-only channel has no Shorts slot to stay out of the way of, so
+    # nothing has to age first — default 0. Mixed channels keep the 15-day wait.
+    min_age_days = int(channel.get("longform_min_age_days", 0 if longform_only else 15))
     exclude_ids = exclude_ids or set()
 
     # Age cutoff: video must have been posted on TikTok at least min_age_days ago.
@@ -905,7 +934,7 @@ def _pick_tiered_split_longform(channel: Dict[str, Any],
     # Any format counts: a video that already went out as a Short must not come
     # back as a longform. Re-posting old Shorts as longform was intentional once
     # and produced 85 duplicates on this channel; it is now opt-in per channel.
-    if channel.get("allow_repost_other_format", False):
+    if longform_only or channel.get("allow_repost_other_format", False):
         already_longformed = db.get_longformed_video_ids(channel_id)
     else:
         already_longformed = db.get_posted_video_ids(channel_id, upload_mode="tiered_split")
@@ -920,13 +949,14 @@ def _pick_tiered_split_longform(channel: Dict[str, Any],
 
     # TikTok returns newest-first, so eligible[0] is the newest video ≥ min_age_days old.
     if not eligible:
-        logger.info("[%s] No eligible longform videos found (all ≥%d-day-old videos already longformed)",
-                    channel_id, min_age_days)
+        logger.info("[%s] No eligible longform videos found (every video%s is already longformed)",
+                    channel_id, "" if min_age_days == 0 else " at least %d days old" % min_age_days)
         return None
 
     video = eligible[0]
-    logger.info("[%s] tiered_split slot 2: selected video %s | '%s' (age cutoff %d days)",
-                channel_id, video["id"], video.get("title", "")[:60], min_age_days)
+    logger.info("[%s] slot 2: selected video %s | '%s' (%s)",
+                channel_id, video["id"], video.get("title", "")[:60],
+                "no age limit" if min_age_days == 0 else "age cutoff %d days" % min_age_days)
     db.record_video_seen(channel_id, video, format_type="longform")
     return video
 
