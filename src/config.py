@@ -66,6 +66,8 @@ def _validate_channel(ch: Dict[str, Any]) -> Dict[str, Any]:
     ch.setdefault("shorts_max_seconds", 180)  # 3 minutes
     ch.setdefault("upload_mode", "short_only")
     ch.setdefault("longform_title_suffix", "")
+    ch.setdefault("privacy_status", "public")
+    ch.setdefault("skip_slots", [])
 
     # Validate upload_mode
     valid_modes = {"short_only", "dual", "longform_only", "split", "trim_dual", "tiered_split"}
@@ -73,6 +75,23 @@ def _validate_channel(ch: Dict[str, Any]) -> Dict[str, Any]:
         raise ValueError(
             f"Channel '{ch['id']}': upload_mode must be one of "
             f"{sorted(valid_modes)}, got '{ch['upload_mode']}'"
+        )
+
+    # Validate privacy_status
+    valid_privacy = {"public", "private", "unlisted"}
+    if ch["privacy_status"] not in valid_privacy:
+        raise ValueError(
+            f"Channel '{ch['id']}': privacy_status must be one of "
+            f"{sorted(valid_privacy)}, got '{ch['privacy_status']}'"
+        )
+
+    # Validate skip_slots
+    try:
+        ch["skip_slots"] = [int(x) for x in (ch["skip_slots"] or [])]
+    except (TypeError, ValueError):
+        raise ValueError(
+            f"Channel '{ch['id']}': skip_slots must be a list of slot numbers, "
+            f"got {ch['skip_slots']!r}"
         )
 
     return ch

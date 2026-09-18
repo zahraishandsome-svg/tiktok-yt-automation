@@ -68,6 +68,15 @@ def run_channel(channel: Dict[str, Any], slot: int, dry_run: bool = False) -> Di
         "error": None,
     }
 
+    # Slots switched off in channels.yaml never upload, even if their workflow
+    # (or cron-job.org) still fires. Channel 3 uses this to stop Shorts while the
+    # Longform slot keeps its own schedule.
+    if slot in {int(x) for x in (channel.get("skip_slots") or [])}:
+        logger.info("[%s] Slot %d is disabled in channels.yaml (skip_slots) — nothing to upload",
+                    channel_id, slot)
+        result["status"] = "skipped"
+        return result
+
     run_id = db.start_run(channel_id, slot)
 
     try:
@@ -1012,6 +1021,7 @@ def _upload_video(channel: Dict[str, Any], video: Dict[str, Any],
         is_short=is_short,
         description_footer=channel.get("description_footer", ""),
         publish_at=_get_publish_at(channel, slot),
+        privacy_status=channel.get("privacy_status", "public"),
         dry_run=dry_run,
     )
 

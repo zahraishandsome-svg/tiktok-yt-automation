@@ -21,6 +21,11 @@
 #   min_backlog_for_slot1 Optional int. Slot 1 is skipped unless this many unuploaded
 #                         eligible videos exist. Use with min_upload_date to drop to 1/day
 #                         automatically once the backlog runs out.
+#   privacy_status        public (default) | private | unlisted. Applies to every upload
+#                         on the channel. private = video stays private until a human
+#                         publishes it; nothing is auto-scheduled.
+#   skip_slots            Optional list of slot numbers that must never upload, e.g. [1].
+#                         Guards against the slot's workflow/cron still firing.
 #   upload_mode           Controls what gets uploaded per slot (default: short_only).
 #                           short_only    Original 9:16 as Short (or regular if long/horizontal).
 #                                         Existing behaviour — all current channels use this.
@@ -46,7 +51,13 @@ channels:
     owner_email: "zahidlateefjapan@gmail.com"
     google_credentials_file: "credentials/channel_3_client_secret.json"
     oauth_token_file: "tokens/channel_3_token.json"
-    videos_per_day: 2
+    # One upload a day: the Longform slot only. Shorts are switched off below.
+    videos_per_day: 1
+    # Every upload lands Private and STAYS private (no scheduled publish time).
+    # The owner turns monetisation on and publishes it by hand each day.
+    privacy_status: private
+    # Slot 1 was the Shorts slot — disabled 2026-09-18, no Shorts on this channel.
+    skip_slots: [1]
     description_footer: ""
     default_tags:
       - muk
@@ -56,8 +67,10 @@ channels:
     enabled: true
     max_retry_days: 7
     shorts_max_seconds: 180
+    # Kept as tiered_split so slot 2 keeps its proven Longform picker (>=15d old,
+    # may re-use a clip already posted as a Short). Slot 1 never runs — see skip_slots.
     upload_mode: tiered_split
-    # Slot 1 (Short): only upload 2026+ content as Shorts
+    # Slot 1 (Short): only upload 2026+ content as Shorts  [slot 1 is disabled]
     min_upload_date: "2026-01-01"
     # Post a Short whenever at least 1 fresh 2026+ video exists. (In tiered_split the
     # Longform slot pulls from OLD videos ≥15d, so there's no need to reserve fresh
@@ -71,6 +84,7 @@ channels:
     # Download budget per run — high enough to skip past several short clips to find a
     # 60s+ one. Short clips get marked skipped, so future runs converge quickly.
     max_download_candidates: 8
+    # Upload times (cron-job.org fires the workflows). Unchanged.
     slot_publish_times_utc:
-      1: "09:00"   # PUBLIC at 6 PM JST
-      2: "11:00"   # PUBLIC at 8 PM JST
+      1: "09:00"   # disabled (was the Short)
+      2: "11:00"   # 8 PM JST — the one daily Longform, uploaded Private
