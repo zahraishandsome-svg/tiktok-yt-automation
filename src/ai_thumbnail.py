@@ -153,7 +153,14 @@ def image(p: dict, fr, feedback: str = "") -> Image.Image:
             wait = 20 * (attempt + 1)
             print(f"vertex {exc.code} - waiting {wait}s (attempt {attempt + 1})", flush=True)
             time.sleep(wait)
-    data = next(x["inlineData"]["data"] for x in out["candidates"][0]["content"]["parts"] if "inlineData" in x)
+    cand = (out.get("candidates") or [{}])[0]
+    data = next((x["inlineData"]["data"] for x in (cand.get("content") or {}).get("parts", [])
+                 if "inlineData" in x), None)
+    if data is None:
+        # no image came back (e.g. the model's own safety filter): say why and let the
+        # caller try again
+        raise RuntimeError(f"no image returned (finishReason={cand.get('finishReason')}, "
+                           f"block={out.get('promptFeedback', {}).get('blockReason')})")
     return Image.open(io.BytesIO(base64.b64decode(data))).convert("RGB").resize((1280, 720), Image.LANCZOS)
 
 
@@ -194,7 +201,15 @@ def build_base(p, fr, tries: int = 2):
     face_refs = [fr[i][3] for i in p["face_frames"]][:3] or [fr[p["hero_frame"]][3]]
     feedback, best = "", None
     for n in range(1, tries + 1):
-        cand = image(p, fr, feedback)
+        try:
+            cand = image(p, fr, feedback)
+        except RuntimeError as exc:          # empty answer from the image model
+            print(f"image attempt {n}: {exc}")
+            if n == tries and best is None:
+                cand = image(p, fr, "Keep it wholesome and family-friendly.")   # last try
+            else:
+                feedback = "Keep it wholesome and family-friendly."
+                continue
         verdict = same_person(cand, face_refs)
         print(f"identity check {n}: score {verdict['score']}/10 same={verdict['same_person']} - {verdict['differences']}")
         if best is None or verdict["score"] > best[1]:
