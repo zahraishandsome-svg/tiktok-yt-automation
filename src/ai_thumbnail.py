@@ -99,7 +99,7 @@ def frames(video: Path, outdir: Path):
     return out
 
 
-def plan(fr, caption: str, lang: str) -> dict:
+def plan(fr, caption: str, lang: str, avoid=None) -> dict:
     client = anthropic.Anthropic()
     content = []
     for i, t, small, _ in fr:
@@ -107,6 +107,9 @@ def plan(fr, caption: str, lang: str) -> dict:
         content.append({"type": "image", "source": {"type": "base64", "media_type": "image/jpeg",
                                                     "data": base64.b64encode(small.read_bytes()).decode()}})
     content.append({"type": "text", "text": f"Caption: {caption}\nThumbnail text language: {lang}"})
+    if avoid:
+        content.append({"type": "text", "text": "Hooks this channel already used (write a DIFFERENT one, "
+                        "never repeat or closely copy these): " + " / ".join(avoid)})
     resp = client.messages.create(
         model="claude-opus-5-5",
         max_tokens=16000,

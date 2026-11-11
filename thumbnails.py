@@ -75,8 +75,14 @@ def main():
     con = db()
     done = {r[0] for r in con.execute("SELECT youtube_video_id FROM thumbnails")}
     seed = ROOT / "data" / "thumbnails_done.txt"   # thumbnails made outside the workflow
-    if seed.exists():
-        done |= {ln.strip() for ln in seed.read_text().splitlines() if ln.strip()}
+    seed_hooks = []
+    if seed.exists():   # lines: "<youtube id>" or "<youtube id><TAB><hook>"
+        for ln in seed.read_text(encoding="utf-8").splitlines():
+            parts = ln.strip().split("\t")
+            if parts and parts[0]:
+                done.add(parts[0])
+                if len(parts) > 1 and parts[1]:
+                    seed_hooks.append(parts[1])
     q = ("SELECT youtube_video_id, tiktok_video_id, tiktok_url, tiktok_title FROM posted_videos "
          "WHERE channel_id=? AND format_type='longform' AND status='uploaded' "
          "AND youtube_video_id IS NOT NULL AND youtube_video_id NOT LIKE 'already%' ")
@@ -116,7 +122,10 @@ def main():
             if not src:
                 raise RuntimeError("video could not be downloaded from TikTok or YouTube")
             fr = at.frames(Path(src), work / "frames")
-            plan = at.plan(fr, r["tiktok_title"] or "", a.lang)
+            recent = [x[0] for x in con.execute(
+                "SELECT hook FROM thumbnails WHERE channel_id=? AND hook IS NOT NULL "
+                "ORDER BY made_at DESC LIMIT 60", (a.channel,))] + seed_hooks[-60:]
+            plan = at.plan(fr, r["tiktok_title"] or "", a.lang, avoid=recent)
             base, how = at.build_base(plan, fr)
             thumb = at.add_text(base.copy(), plan.get("hook_lines") or [plan["hook_text"]],
                                 plan["text_side"], plan["accent_color"])
