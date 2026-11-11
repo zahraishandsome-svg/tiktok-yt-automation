@@ -121,6 +121,9 @@ jobs:
           fi
 
       - name: Run Slot 2
+        env:
+          # Claude writes the title + description of long uploads (ai_longform_metadata)
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
           # Default to channel_3 only; override with manual dispatch input if set
           CHANNEL_ARG="--channel channel_3"

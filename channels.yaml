@@ -71,6 +71,8 @@ channels:
       - viral
     youtube_category_id: "22"
     enabled: true
+    # Long uploads get a Claude-written title + description in this language (owner 2026-11-12, long only)
+    ai_longform_metadata: Japanese
     max_retry_days: 7
     shorts_max_seconds: 180
     # Kept as tiered_split so slot 2 keeps its proven Longform picker (>=15d old,

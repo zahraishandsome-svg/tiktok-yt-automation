@@ -131,6 +131,11 @@ def main():
             recent = [x[0] for x in con.execute(
                 "SELECT hook FROM thumbnails WHERE channel_id=? AND hook IS NOT NULL "
                 "ORDER BY made_at DESC LIMIT 60", (a.channel,))] + seed_hooks[-60:]
+            from src import ai_metadata
+            yt_title = ai_metadata.title_for(ROOT / "data" / f"{os.environ.get('DB_PAGE_ID')}.db",
+                                             a.channel, r["tiktok_video_id"])
+            if yt_title:   # the thumbnail text must not just repeat the video's title
+                recent = recent + [yt_title]
             plan = at.plan(fr, r["tiktok_title"] or "", a.lang, avoid=recent)
             base, how = at.build_base(plan, fr)
             thumb = at.add_text(base.copy(), plan.get("hook_lines") or [plan["hook_text"]],
