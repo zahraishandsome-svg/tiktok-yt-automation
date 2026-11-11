@@ -101,7 +101,20 @@ def main():
             url = r["tiktok_url"] or f"https://www.tiktok.com/@{channel['tiktok_username']}/video/{r['tiktok_video_id']}"
             src = download_video(url, r["tiktok_video_id"], work)
             if not src:
-                raise RuntimeError("original TikTok could not be downloaded")
+                # TikTok original gone: our own YouTube upload (public once the owner
+                # publishes it) still has the full clip in the middle of the frame
+                import yt_dlp
+                tmpl = str(work / f"yt_{vid}.%(ext)s")
+                try:
+                    with yt_dlp.YoutubeDL({"quiet": True, "no_warnings": True, "outtmpl": tmpl,
+                                           "format": "bv*[ext=mp4][height<=1080]+ba[ext=m4a]/b[ext=mp4]/b",
+                                           "merge_output_format": "mp4"}) as y:
+                        y.extract_info(f"https://www.youtube.com/watch?v={vid}", download=True)
+                    src = next(iter(sorted(work.glob(f"yt_{vid}.*"))), None)
+                except Exception as exc:  # noqa: BLE001
+                    print(f"thumbnails: YouTube fallback failed for {vid}: {str(exc)[:150]}")
+            if not src:
+                raise RuntimeError("video could not be downloaded from TikTok or YouTube")
             fr = at.frames(Path(src), work / "frames")
             plan = at.plan(fr, r["tiktok_title"] or "", a.lang)
             base, how = at.build_base(plan, fr)
