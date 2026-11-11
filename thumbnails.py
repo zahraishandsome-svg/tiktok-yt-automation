@@ -17,7 +17,7 @@ import os
 import sqlite3
 import sys
 import tempfile
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 import yaml
@@ -83,8 +83,10 @@ def main():
                 done.add(parts[0])
                 if len(parts) > 1 and parts[1]:
                     seed_hooks.append(parts[1])
+    # long-form uploads, plus reposts on channels that repost as long-form
+    formats = "('longform','repost')" if channel.get("repost_as_longform") else "('longform')"
     q = ("SELECT youtube_video_id, tiktok_video_id, tiktok_url, tiktok_title FROM posted_videos "
-         "WHERE channel_id=? AND format_type='longform' AND status='uploaded' "
+         f"WHERE channel_id=? AND format_type IN {formats} AND status='uploaded' "
          "AND youtube_video_id IS NOT NULL AND youtube_video_id NOT LIKE 'already%' ")
     if a.video:
         rows = con.execute(q + "AND youtube_video_id=?", (a.channel, a.video)).fetchall()
@@ -92,7 +94,9 @@ def main():
     elif a.backfill:
         rows = con.execute(q + "ORDER BY posted_at DESC LIMIT ?", (a.channel, a.backfill)).fetchall()
     else:
-        rows = con.execute(q + "AND posted_at LIKE ? ORDER BY posted_at", (a.channel, date.today().isoformat() + "%")).fetchall()
+        # recent uploads (3 days) without a thumbnail, so a miss is caught next run
+        since = (date.today() - timedelta(days=3)).isoformat()
+        rows = con.execute(q + "AND posted_at >= ? ORDER BY posted_at", (a.channel, since)).fetchall()
     todo = [r for r in rows if r["youtube_video_id"] not in done]
     print(f"thumbnails: {len(rows)} long video(s) in scope, {len(todo)} without an AI thumbnail")
     if not todo:
@@ -104,8 +108,10 @@ def main():
         vid = r["youtube_video_id"]
         work = Path(tempfile.mkdtemp(prefix=f"thumb_{vid}_"))
         try:
-            url = r["tiktok_url"] or f"https://www.tiktok.com/@{channel['tiktok_username']}/video/{r['tiktok_video_id']}"
-            src = download_video(url, r["tiktok_video_id"], work)
+            src = None
+            if not str(r["tiktok_video_id"]).startswith("repost:"):   # reposts have no TikTok original
+                url = r["tiktok_url"] or f"https://www.tiktok.com/@{channel['tiktok_username']}/video/{r['tiktok_video_id']}"
+                src = download_video(url, r["tiktok_video_id"], work)
             if not src:
                 # TikTok original gone: our own YouTube upload (public once the owner
                 # publishes it) still has the full clip in the middle of the frame
