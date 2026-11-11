@@ -129,6 +129,21 @@ jobs:
           fi
           python run.py --slot 2 $CHANNEL_ARG
 
+      - name: AI thumbnail for today's long video
+        # Claude watches the video, Vertex (Gemini) draws the scene, we add the Japanese
+        # text; then thumbnails.set. Never fails the upload job.
+        if: always()
+        continue-on-error: true
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          VERTEX_API_KEY: ${{ secrets.VERTEX_API_KEY }}
+          VERTEX_PROJECT: ${{ secrets.VERTEX_PROJECT }}
+          DB_PAGE_ID: channel_3
+        run: |
+          mkdir -p fonts
+          curl -fsSL --retry 3 --max-time 120 -o fonts/NotoSansJP.ttf "https://github.com/google/fonts/raw/main/ofl/notosansjp/NotoSansJP%5Bwght%5D.ttf"
+          python thumbnails.py --channel channel_3 --lang Japanese
+
       - name: Repost fallback (no empty days)
         # If this slot uploaded nothing today (TikTok had nothing new), repost one of
         # the channel's own best videos. At most one repost a day; see repost.py.
