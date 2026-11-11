@@ -109,9 +109,17 @@ def main():
         work = Path(tempfile.mkdtemp(prefix=f"thumb_{vid}_"))
         try:
             src = None
-            if not str(r["tiktok_video_id"]).startswith("repost:"):   # reposts have no TikTok original
-                url = r["tiktok_url"] or f"https://www.tiktok.com/@{channel['tiktok_username']}/video/{r['tiktok_video_id']}"
-                src = download_video(url, r["tiktok_video_id"], work)
+            # Always the original TikTok first; YouTube only when TikTok fails.
+            tt_id, tt_url = str(r["tiktok_video_id"]), r["tiktok_url"]
+            if tt_id.startswith("repost:"):
+                # repost:<youtube id of the earlier upload>:<date> -> that upload's TikTok original
+                orig = con.execute("SELECT tiktok_video_id, tiktok_url FROM posted_videos WHERE "
+                                   "youtube_video_id=? AND tiktok_video_id NOT LIKE 'repost:%' LIMIT 1",
+                                   (tt_id.split(":")[1],)).fetchone()
+                tt_id, tt_url = (orig["tiktok_video_id"], orig["tiktok_url"]) if orig else (None, None)
+            if tt_id:
+                url = tt_url or f"https://www.tiktok.com/@{channel['tiktok_username']}/video/{tt_id}"
+                src = download_video(url, tt_id, work)
             if not src:
                 # TikTok original gone: our own YouTube upload (public once the owner
                 # publishes it) still has the full clip in the middle of the frame

@@ -5,7 +5,7 @@ YouTube-style title and description in the channel's language. Kept cheap: 8 fra
 384 px, Sonnet, medium effort, short output (~$0.01 per video). Any failure returns None and
 the upload falls back to the TikTok caption, so an upload is never blocked.
 
-Channel config: ai_longform_metadata: Japanese   (language; leave unset = off)
+Channel config: ai_longform_metadata: Japanese / English   (language; unset = off)
 """
 import base64
 import json
@@ -34,28 +34,29 @@ SCHEMA = {
     },
 }
 
-SYSTEM = """You write YouTube titles and descriptions for long-form videos on a family / daily-life
-channel. Each video is a real clip; you see frames from it in order plus the original caption.
+SYSTEM = """You write YouTube titles and descriptions for long-form videos. Each video is a real
+clip reposted from the creator's TikTok (any niche: family, food, crafts, pets, comedy, ...);
+you see frames from it in order plus the creator's original caption.
 
-First work out what actually happens in the clip (who, what, the funny / sweet / surprising
-moment). The caption is written by the creator and is the TRUTH about the story: who made or
-did what, who is who, how they feel. Your title must keep the caption's meaning (e.g. if the
+First work out what actually happens in the clip (who, what, the funny / sweet / surprising /
+satisfying moment). The caption is written by the creator and is the TRUTH about the story:
+who made or did what, who is who, how they feel. Keep the caption's meaning (e.g. if the
 caption says someone else drew the picture, never say the child drew it). Use a person's name
-only if it is written in the caption; otherwise say 息子 / 娘 / パパ / ママ / 赤ちゃん etc. Strip @handles.
-Then write, in the requested language, the way a good native YouTuber of this genre
-writes them:
+only if it is written in the caption; otherwise use plain roles (son, mom, the chef ...;
+Japanese: 息子 / 娘 / パパ / ママ / 赤ちゃん). Strip @handles.
+Then write, in the requested language, the way a good native YouTuber of this genre writes:
 
 TITLE: natural and clickable, built on the real moment of THIS clip, makes people curious
-without lying. 20-45 characters for Japanese (max 70 for other languages). It may use one
-fitting emoji and the usual Japanese brackets like 【】 when natural. No hashtags in the title,
-no clickbait that the clip does not deliver, no ALL CAPS. Never copy the caption word for word.
-Must be clearly different from the channel's earlier titles given below.
+without lying. Japanese: 20-45 characters, may use 【】 when natural. English and other
+languages: 40-70 characters, normal sentence or title case. At most one fitting emoji. No
+hashtags in the title, no clickbait that the clip does not deliver, no ALL CAPS. Never copy
+the caption word for word. Must be clearly different from the channel's earlier titles.
 
 DESCRIPTION: 2-4 short lines that describe the moment warmly in the same language (what
 happens, the feeling), one gentle line inviting viewers to subscribe / comment, then a last
 line with 3-5 relevant hashtags. No links, no timestamps, no made-up facts (names, ages,
-places) that the caption does not state - this also applies to the hashtags (no #3歳 etc.
-unless the caption says the age). Under 600 characters."""
+places, prices) that the caption does not state - this also applies to the hashtags (no
+#3歳 / #3yearsold etc. unless the caption says the age). Under 600 characters."""
 
 
 def _frames(video: Path, outdir: Path) -> List[Path]:
