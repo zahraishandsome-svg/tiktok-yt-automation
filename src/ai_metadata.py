@@ -54,7 +54,8 @@ Must be clearly different from the channel's earlier titles given below.
 DESCRIPTION: 2-4 short lines that describe the moment warmly in the same language (what
 happens, the feeling), one gentle line inviting viewers to subscribe / comment, then a last
 line with 3-5 relevant hashtags. No links, no timestamps, no made-up facts (names, ages,
-places) that the caption or the frames do not show. Under 600 characters."""
+places) that the caption does not state - this also applies to the hashtags (no #3歳 etc.
+unless the caption says the age). Under 600 characters."""
 
 
 def _frames(video: Path, outdir: Path) -> List[Path]:
