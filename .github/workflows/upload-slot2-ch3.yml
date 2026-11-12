@@ -120,17 +120,19 @@ jobs:
             echo "TIKTOK_COOKIES_FILE=/tmp/tiktok_cookies.txt" >> $GITHUB_ENV
           fi
 
-      - name: Run Slot 2
+      - name: Run Slot 2 (merged 3 min+ long video)
+        # Owner test 2026-11-12: ONE merged 3 min+ video a day (merge_upload.py) - same-topic
+        # clips (new, or used 15+ days ago) joined in original 9:16, AI title/description/
+        # thumbnail. If today's video is already up the run stops by itself.
         env:
-          # Claude writes the title + description of long uploads (ai_longform_metadata)
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          VERTEX_API_KEY: ${{ secrets.VERTEX_API_KEY }}
+          VERTEX_PROJECT: ${{ secrets.VERTEX_PROJECT }}
+          DB_PAGE_ID: channel_3
         run: |
-          # Default to channel_3 only; override with manual dispatch input if set
-          CHANNEL_ARG="--channel channel_3"
-          if [ -n "${{ github.event.inputs.channel }}" ]; then
-            CHANNEL_ARG="--channel ${{ github.event.inputs.channel }}"
-          fi
-          python run.py --slot 2 $CHANNEL_ARG
+          mkdir -p fonts
+          curl -fsSL --retry 3 --max-time 120 -o fonts/NotoSansJP.ttf "https://github.com/google/fonts/raw/main/ofl/notosansjp/NotoSansJP%5Bwght%5D.ttf" || true
+          python merge_upload.py --channel channel_3 --slot 2
 
       - name: AI thumbnail for today's long video
         # Claude watches the video, Vertex (Gemini) draws the scene, we add the Japanese
@@ -147,16 +149,6 @@ jobs:
           mkdir -p fonts
           curl -fsSL --retry 3 --max-time 120 -o fonts/NotoSansJP.ttf "https://github.com/google/fonts/raw/main/ofl/notosansjp/NotoSansJP%5Bwght%5D.ttf"
           python thumbnails.py --channel channel_3 --lang Japanese
-
-      - name: Repost fallback (no empty days)
-        # If this slot uploaded nothing today (TikTok had nothing new), repost one of
-        # the channel's own best videos. At most one repost a day; see repost.py.
-        if: always()
-        env:
-          YT_API_KEY: ${{ secrets.YT_API_KEY }}
-          YT_CHANNEL_ID: UC5ZbpvXYfJY3zgEyQCtlfeg
-          DB_PAGE_ID: channel_3
-        run: python repost.py --slot 2 --channel channel_3
 
       - name: Save DB cache
         if: always()

@@ -73,6 +73,10 @@ channels:
     enabled: true
     # Long uploads get a Claude-written title + description in this language (owner 2026-11-12, long only)
     ai_longform_metadata: Japanese
+    # MERGED 3 min+ long videos, 1 per day (owner test 2026-11-12): merge_upload.py joins
+    # same-topic clips (new, or used 15+ days ago) in original 9:16; no 4:3, no repost fallback.
+    merge_long:
+      max_clips: 4
     max_retry_days: 7
     shorts_max_seconds: 180
     # Kept as tiered_split so slot 2 keeps its proven Longform picker (>=15d old,

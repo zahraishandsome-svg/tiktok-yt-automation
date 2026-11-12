@@ -123,7 +123,7 @@ def main():
         # recent uploads (3 days) without a thumbnail, so a miss is caught next run
         since = (date.today() - timedelta(days=3)).isoformat()
         cand = con.execute(q + "AND posted_at >= ? ORDER BY posted_at", (a.channel, since)).fetchall()
-    long_formats = {"longform"} | ({"repost"} if channel.get("repost_as_longform") else set())
+    long_formats = {"longform", "merge"} | ({"repost"} if channel.get("repost_as_longform") else set())
     lengths = yt_lengths([r["youtube_video_id"] for r in cand if r["format_type"] not in long_formats])
     rows, seen = [], set()
     for r in cand:
