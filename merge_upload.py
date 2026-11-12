@@ -367,6 +367,10 @@ def main():
                         (vid, a.channel, json.dumps([c["id"] for c in chosen]), topic, meta["title"], seconds, now))
             for c in chosen:
                 con.execute("INSERT INTO merge_parts VALUES (?,?,?,?)", (a.channel, c["id"], vid, now))
+        from src import catalog
+        catalog.record(db._get_db_path(), vid, a.channel, "merge" if len(chosen) > 1 else "single", meta["title"],
+                       [{"id": c["id"], "caption": c.get("title"), "url": c["url"], "seconds": c.get("duration")}
+                        for c in chosen])
         for c in chosen:
             if c["id"] not in use:      # first time on the channel
                 db.mark_uploaded(a.channel, c["id"], vid, format_type="merge", tiktok_url=c["url"],
