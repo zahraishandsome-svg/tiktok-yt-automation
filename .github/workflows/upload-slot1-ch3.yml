@@ -121,6 +121,9 @@ jobs:
           fi
 
       - name: Run Slot 1
+        env:
+          # Claude title + description if a clip over 3 min goes up (it becomes a long video)
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
           # Default to channel_3 only; override with manual dispatch input if set
           CHANNEL_ARG="--channel channel_3"
