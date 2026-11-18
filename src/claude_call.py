@@ -19,6 +19,18 @@ import tempfile
 log = logging.getLogger(__name__)
 
 
+def _usage_line(via, model, inp, cache_create, cache_read, out, cost):
+    """One machine-readable line per Claude call, so Friday can add up how much of the owner's
+    Claude limit this workflow used (jp_status.py --usage). cost_usd = Claude Code's own estimate of
+    what the call would cost on the API (the subscription itself is a flat $20)."""
+    rec = {"via": via, "model": model, "channel": os.environ.get("DB_PAGE_ID", ""),
+           "in": inp or 0, "cache_create": cache_create or 0, "cache_read": cache_read or 0, "out": out or 0,
+           "cost_usd": round(cost, 4) if isinstance(cost, (int, float)) else None}
+    log.info("claude (%s, %s): %s in + %s cache-write + %s cache-read / %s out tokens", via, model, rec["in"],
+             rec["cache_create"], rec["cache_read"], rec["out"])
+    log.info("CLAUDE_USAGE %s", json.dumps(rec))
+
+
 def _cli():
     return shutil.which("claude")
 
@@ -45,8 +57,8 @@ def _via_subscription(system, content, schema, model, timeout, effort="medium"):
     if result.get("is_error") or "structured_output" not in result:
         raise RuntimeError(f"claude cli error: {str(result.get('result') or result.get('subtype'))[:300]}")
     u = result.get("usage") or {}
-    log.info("claude (subscription, %s): %s in / %s out tokens", model, u.get("input_tokens"),
-             u.get("output_tokens"))
+    _usage_line("subscription", model, u.get("input_tokens"), u.get("cache_creation_input_tokens"),
+                u.get("cache_read_input_tokens"), u.get("output_tokens"), result.get("total_cost_usd"))
     return result["structured_output"]
 
 
@@ -61,7 +73,8 @@ def _via_api(system, content, schema, model, max_tokens, effort):
     if resp.stop_reason != "end_turn":
         raise RuntimeError(f"stop_reason={resp.stop_reason}")
     u = resp.usage
-    log.info("claude (api, %s): %d in / %d out tokens", model, u.input_tokens, u.output_tokens)
+    _usage_line("api", model, u.input_tokens, getattr(u, "cache_creation_input_tokens", 0),
+                getattr(u, "cache_read_input_tokens", 0), u.output_tokens, None)
     return json.loads(next(b.text for b in resp.content if b.type == "text"))
 
 
