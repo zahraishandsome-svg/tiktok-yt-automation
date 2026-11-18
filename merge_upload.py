@@ -22,6 +22,7 @@ import json
 import logging
 import os
 import random
+import shutil
 import re
 import sqlite3
 import subprocess
@@ -126,30 +127,8 @@ def pick(anchor, cands, max_clips, retry_note=""):
             "CANDIDATES (id | length | views | date | caption):\n" + "\n".join(lines))
     if retry_note:
         text += "\n\n" + retry_note
-    try:
-        from src.claude_call import structured
-        return structured(PICK_SYSTEM, text, PICK_SCHEMA, model=MODEL, max_tokens=4000)
-    except Exception as exc:  # noqa: BLE001 - no Claude today: never block the upload
-        log.warning("pick: Claude not available (%s) - using the no-Claude pick", str(exc)[:200])
-        return fallback_pick(anchor, cands, max_clips)
-
-
-def fallback_pick(anchor, cands, max_clips):
-    """Without Claude: the anchor plus the clips the creator posted closest in time to it
-    (usually the same day / same series), until the 3-minute minimum is reached."""
-    t0 = anchor.get("timestamp") or 0
-    near = sorted((c for c in cands if c.get("timestamp")), key=lambda c: abs((c.get("timestamp") or 0) - t0))
-    ids, total = [anchor["id"]], anchor["duration"]
-    for c in near:
-        if total >= MIN_TOTAL or len(ids) >= max_clips:
-            break
-        if abs((c.get("timestamp") or 0) - t0) > 3 * 86400:      # only clips within 3 days of the anchor
-            break
-        ids.append(c["id"])
-        total += c["duration"]
-    ok = total >= MIN_TOTAL and len(ids) <= max_clips
-    return {"possible": ok, "clip_ids": ids if ok else [], "topic": "same days' clips (no-Claude pick)",
-            "reason": f"fallback by posting time, total {int(total)} s"}
+    from src.claude_call import structured      # owner 2026-11-19: no Claude -> no upload (raises)
+    return structured(PICK_SYSTEM, text, PICK_SCHEMA, model=MODEL, max_tokens=4000)
 
 
 def probe(path):
@@ -223,28 +202,32 @@ def upload(channel, path, title, desc):
     return yt, resp["id"]
 
 
-def thumbnail(yt, con, channel_id, vid, video, caption, lang, title):
-    from googleapiclient.http import MediaFileUpload
+def make_thumbnail(con, channel_id, video, caption, lang, title, workdir):
+    """The AI thumbnail (Claude plans + checks, Gemini paints) made BEFORE the upload.
+    Owner 2026-11-19: no AI thumbnail -> no upload, so this raises on any failure."""
     from src import ai_thumbnail as at
-    with tempfile.TemporaryDirectory(prefix="mthumb_") as tmp:
-        fr = at.frames(Path(video), Path(tmp) / "frames")
-        recent = [r[0] for r in con.execute("SELECT hook FROM thumbnails WHERE channel_id=? AND hook IS NOT NULL "
-                                            "ORDER BY made_at DESC LIMIT 60", (channel_id,))]
-        p = at.plan(fr, caption, lang, avoid=recent + [title])
-        base, how = at.build_base(p, fr)
-        img = at.add_text(base.copy(), p.get("hook_lines") or [p["hook_text"]], p["text_side"], p["accent_color"])
-        out = Path(tmp) / "thumb.jpg"
-        img.save(out, quality=90)
-        if yt is not None:
-            yt.thumbnails().set(videoId=vid, media_body=MediaFileUpload(str(out), mimetype="image/jpeg")).execute()
-            with con:
-                con.execute("INSERT OR REPLACE INTO thumbnails VALUES (?,?,?,?,?)",
-                            (vid, channel_id, p["hook_text"], how, datetime.utcnow().isoformat()))
-        else:
-            keep = ROOT / "logs" / f"dryrun_thumb_{channel_id}.jpg"
-            keep.parent.mkdir(exist_ok=True)
-            img.save(keep, quality=90)
-        log.info("thumbnail: '%s' (%s) = %s", p["hook_text"], how, p.get("hook_meaning_en"))
+    if not os.environ.get("VERTEX_API_KEY"):
+        raise RuntimeError("VERTEX_API_KEY missing - cannot make the AI thumbnail")
+    fr = at.frames(Path(video), Path(workdir) / "frames")
+    recent = [r[0] for r in con.execute("SELECT hook FROM thumbnails WHERE channel_id=? AND hook IS NOT NULL "
+                                        "ORDER BY made_at DESC LIMIT 60", (channel_id,))]
+    p = at.plan(fr, caption, lang, avoid=recent + [title])
+    base, how = at.build_base(p, fr)
+    img = at.add_text(base.copy(), p.get("hook_lines") or [p["hook_text"]], p["text_side"], p["accent_color"])
+    out = Path(workdir) / "thumb.jpg"
+    img.save(out, quality=90)
+    log.info("thumbnail: '%s' (%s) = %s", p["hook_text"], how, p.get("hook_meaning_en"))
+    return out, p, how
+
+
+def set_thumbnail(yt, con, channel, vid, thumb, p, how):
+    """thumbnails.set right after the upload (the thumbnail was made and checked BEFORE uploading)."""
+    from googleapiclient.http import MediaFileUpload
+    yt.thumbnails().set(videoId=vid, media_body=MediaFileUpload(str(thumb), mimetype="image/jpeg")).execute()
+    with con:
+        con.execute("INSERT OR REPLACE INTO thumbnails VALUES (?,?,?,?,?)",
+                    (vid, channel["id"], p["hook_text"], how, datetime.utcnow().isoformat()))
+    log.info("[%s] AI thumbnail set", channel["id"])
 
 
 def main():
@@ -362,15 +345,17 @@ def main():
                        + " / ".join(f"{n + 1}) {c.get('title') or ''}" for n, c in enumerate(chosen)))
         from src import ai_metadata
         meta = ai_metadata.write(merged, caption, lang, a.channel, anchor["id"], db._get_db_path())
-        if not meta:
-            meta = {"title": (("【まとめ】" if len(chosen) > 1 else "") + (anchor.get("title") or channel["id"]))[:95],
-                    "description": "\n".join(c.get("title") or "" for c in chosen)}
+        if not meta:          # owner 2026-11-19: no Claude title -> no upload today (the retry slot tries again)
+            raise RuntimeError("AI title/description failed - not uploading without Claude")
         log.info("[%s] title: %s", a.channel, meta["title"])
 
+        thumb, tplan, thow = make_thumbnail(con, a.channel, merged, caption, lang, meta["title"], work)
         if a.dry_run:
-            log.info("[%s] DRY RUN - parts %s, not uploading", a.channel, [c["id"] for c in chosen])
-            if not a.no_thumb:
-                thumbnail(None, con, a.channel, "dry", merged, caption, lang, meta["title"])
+            keep = ROOT / "logs" / f"dryrun_thumb_{a.channel}.jpg"
+            keep.parent.mkdir(exist_ok=True)
+            shutil.copy(thumb, keep)
+            log.info("[%s] DRY RUN - parts %s, title + thumbnail OK, not uploading", a.channel,
+                     [c["id"] for c in chosen])
             return 0
 
         yt, vid = upload(channel, merged, meta["title"], meta["description"])
@@ -389,12 +374,18 @@ def main():
             if c["id"] not in use:      # first time on the channel
                 db.mark_uploaded(a.channel, c["id"], vid, format_type="merge", tiktok_url=c["url"],
                                  tiktok_title=c.get("title"), tiktok_timestamp=c.get("timestamp"))
-        finish("success", n=1)
-        if not a.no_thumb and os.environ.get("VERTEX_API_KEY"):
+        # recorded above, so a retry never uploads it twice
+        for attempt in range(3):
             try:
-                thumbnail(yt, con, a.channel, vid, merged, caption, lang, meta["title"])
-            except Exception as exc:  # noqa: BLE001 - the upload itself is done
-                log.warning("[%s] thumbnail failed (the thumbnail step retries): %s", a.channel, str(exc)[:200])
+                set_thumbnail(yt, con, channel, vid, thumb, tplan, thow)
+                break
+            except Exception as exc:  # noqa: BLE001
+                log.warning("[%s] thumbnail/publish attempt %d failed: %s", a.channel, attempt + 1, str(exc)[:200])
+                time.sleep(30 * (attempt + 1))
+        else:
+            finish("failed", f"uploaded {vid} but thumbnails.set failed 3x (the thumbnail step retries)")
+            return 1
+        finish("success", n=1)
         return 0
     except Exception as exc:  # noqa: BLE001
         log.exception("[%s] merged upload failed: %s", a.channel, exc)

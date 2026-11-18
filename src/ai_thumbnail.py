@@ -380,7 +380,6 @@ def build_base(p, fr, tries: int = 4, style=None):
     text, nothing invented) and the tone gate passes (not white / washed out / split).
     A failing image is fixed by an AI edit when only the text or invented items are wrong,
     otherwise made again with the reasons; after the last try the best one is kept."""
-    tries = int(os.environ.get("THUMB_TRIES") or tries)    # subscription (Pro) has small limits: fewer checks
     style = style or p.get("_style")
     side = p.get("text_side", "left")
     feedback, best, prev, edit_next = "", None, None, False

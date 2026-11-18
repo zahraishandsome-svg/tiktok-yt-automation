@@ -6,7 +6,8 @@ Claude Code CLI: GitHub secret CLAUDE_CODE_OAUTH_TOKEN (made once with `claude s
 
 Order: subscription (CLAUDE_CODE_OAUTH_TOKEN + `claude` CLI) -> API key (ANTHROPIC_API_KEY) -> raise.
 Callers catch the error and fall back to a no-Claude path, so an upload is never blocked.
-The subscription has small usage limits, so it defaults to Sonnet (SUB_MODEL) instead of Opus.
+Owner 2026-11-19: same models as on the API (Opus for plans/checks/picks, Sonnet for titles), no
+quality cuts, and NO upload without Claude: callers raise when this raises.
 """
 import json
 import logging
@@ -16,7 +17,6 @@ import subprocess
 import tempfile
 
 log = logging.getLogger(__name__)
-SUB_MODEL = os.environ.get("CLAUDE_SUB_MODEL", "claude-sonnet-5-5")
 
 
 def _cli():
@@ -73,7 +73,7 @@ def structured(system, content, schema, model="claude-opus-5-5", max_tokens=8000
     errors = []
     if os.environ.get("CLAUDE_CODE_OAUTH_TOKEN") and _cli():
         try:
-            return _via_subscription(system or "", content, schema, SUB_MODEL, timeout)
+            return _via_subscription(system or "", content, schema, model, timeout)
         except Exception as exc:  # noqa: BLE001
             errors.append(f"subscription: {exc}")
             log.warning("claude subscription failed: %s", str(exc)[:300])

@@ -692,8 +692,8 @@ def _longform_metadata(channel: Dict[str, Any], video: Dict[str, Any], source_fi
     from . import ai_metadata
     meta = ai_metadata.write(source_file, video.get("title") or "", lang, channel["id"],
                              video["id"], db._get_db_path())
-    if not meta:
-        return title, None
+    if not meta:      # owner 2026-11-19: no upload without the Claude title
+        raise RuntimeError("AI title/description failed - not uploading without Claude")
     return meta["title"], meta["description"]
 
 

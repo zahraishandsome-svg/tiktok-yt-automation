@@ -54,7 +54,6 @@ jobs:
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          THUMB_TRIES: "2"
           VERTEX_API_KEY: ${{ secrets.VERTEX_API_KEY }}
           VERTEX_PROJECT: ${{ secrets.VERTEX_PROJECT }}
           YT_API_KEY: ${{ secrets.YT_API_KEY }}
