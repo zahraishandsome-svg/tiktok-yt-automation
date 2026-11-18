@@ -23,12 +23,12 @@ def _cli():
     return shutil.which("claude")
 
 
-def _via_subscription(system, content, schema, model, timeout):
+def _via_subscription(system, content, schema, model, timeout, effort="medium"):
     msg = {"type": "user", "message": {"role": "user", "content": content}}
     env = {k: v for k, v in os.environ.items() if k not in ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN")}
     with tempfile.TemporaryDirectory(prefix="claude_") as tmp:      # empty cwd: no project settings
         cmd = [_cli(), "-p", "--input-format", "stream-json", "--output-format", "stream-json", "--verbose",
-               "--json-schema", json.dumps(schema), "--model", model, "--system-prompt", system,
+               "--json-schema", json.dumps(schema), "--model", model, "--effort", effort, "--system-prompt", system,
                "--tools", "", "--max-turns", "4", "--no-session-persistence", "--strict-mcp-config"]
         r = subprocess.run(cmd, input=json.dumps(msg) + "\n", capture_output=True, text=True,
                            encoding="utf-8", timeout=timeout, cwd=tmp, env=env)
@@ -73,7 +73,7 @@ def structured(system, content, schema, model="claude-opus-5-5", max_tokens=8000
     errors = []
     if os.environ.get("CLAUDE_CODE_OAUTH_TOKEN") and _cli():
         try:
-            return _via_subscription(system or "", content, schema, model, timeout)
+            return _via_subscription(system or "", content, schema, model, timeout, effort)
         except Exception as exc:  # noqa: BLE001
             errors.append(f"subscription: {exc}")
             log.warning("claude subscription failed: %s", str(exc)[:300])
