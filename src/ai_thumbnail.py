@@ -391,6 +391,19 @@ def build_base(p, fr, tries: int = 4, style=None):
             feedback, edit_next = "Keep it wholesome and family-friendly.", False
             continue
         t = tone(cand, side, style)
+        if not t["ok"] and n < tries:
+            # Owner 2026-11-19 (save Claude limit): the free local tone gate runs FIRST. A picture that
+            # fails it can never be kept, so it is remade with the tone reasons without spending an Opus
+            # review on it. The last try is always reviewed, so "best of" still has Claude's verdict.
+            print(f"tone check {n}: {t['why']} (lum {t['lum']}, sat {t['sat']}, white {t['white']:.0%}, "
+                  f"blank {t['blank']:.0%}) - remaking without a Claude review")
+            feedback = ("The picture is too white / plain: " + t["why"] + ". Fill the frame with the video's "
+                        "colourful real items, big and close; rich true colour, warm light, no white or pastel "
+                        "areas, one continuous photo.")
+            edit_next, prev = False, cand
+            if best is None:
+                best = (cand, (False, False, False, False, 0))
+            continue
         v = review(cand, p, fr)
         print(f"review {n}: person {v['score']}/10 same={v['same_person']} | text_exact={v['text_exact']} "
               f"read='{v['text_read']}' | invented={v['invented_items']}")
