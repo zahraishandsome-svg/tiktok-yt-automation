@@ -94,6 +94,11 @@ jobs:
           key: automation-db-channel_3-${{ github.sha }}-${{ github.run_id }}
           restore-keys: |
             automation-db-channel_3-${{ github.sha }}-
+      - name: Install Claude Code CLI (owner's Claude subscription, 2026-11-19)
+        # The API key has no credit; the AI title/thumbnail/merge pick now use the owner's
+        # $20 subscription via secret CLAUDE_CODE_OAUTH_TOKEN. Never fails the job.
+        run: npm install -g @anthropic-ai/claude-code >/dev/null 2>&1 && claude --version || echo "claude cli not installed"
+
       - name: Restore credentials & tokens
         run: |
           mkdir -p credentials tokens
@@ -124,6 +129,8 @@ jobs:
         env:
           # Claude title + description if a clip over 3 min goes up (it becomes a long video)
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          THUMB_TRIES: "2"
         run: |
           # Default to channel_3 only; override with manual dispatch input if set
           CHANNEL_ARG="--channel channel_3"

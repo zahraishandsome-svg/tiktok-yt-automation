@@ -24,7 +24,6 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-import anthropic
 from PIL import Image, ImageChops, ImageStat
 
 HERE = Path(__file__).parent
@@ -174,7 +173,6 @@ def frames(video: Path, outdir: Path):
 
 
 def plan(fr, caption: str, lang: str, avoid=None, style=None) -> dict:
-    client = anthropic.Anthropic()
     system, schema = SYSTEM, SCHEMA
     if style in STYLES:
         system = SYSTEM + "\n" + STYLES[style]["notes"]
@@ -191,20 +189,8 @@ def plan(fr, caption: str, lang: str, avoid=None, style=None) -> dict:
     if avoid:
         content.append({"type": "text", "text": "Hooks this channel already used (write a DIFFERENT one, "
                         "never repeat or closely copy these): " + " / ".join(avoid)})
-    resp = client.messages.create(
-        model="claude-opus-5-5",
-        max_tokens=16000,
-        system=system,
-        output_config={"effort": "medium", "format": {"type": "json_schema", "schema": schema}},
-        messages=[{"role": "user", "content": content}],
-    )
-    if resp.stop_reason == "refusal":
-        raise SystemExit("Claude declined this video")
-    text = next(b.text for b in resp.content if b.type == "text")
-    u = resp.usage
-    cost = u.input_tokens * 4e-6 + u.output_tokens * 20e-6
-    print(f"claude: {u.input_tokens} in / {u.output_tokens} out tokens ~ ${cost:.3f}")
-    p = json.loads(text)
+    from .claude_call import structured
+    p = structured(system, content, schema, model="claude-opus-5-5", max_tokens=16000)
     p["_lang"], p["_style"] = lang, style
     return p
 
@@ -341,11 +327,9 @@ def review(candidate: Image.Image, p: dict, fr) -> dict:
                  "place, extra people. Ignore light, colour, angle, blur, crop and the headline itself. The same "
                  "kind of item in a slightly different arrangement is fine. [] if none.\n"
                  f"What happens in the video: {p.get('what_happens', '')}"}]
-    resp = anthropic.Anthropic().messages.create(
-        model="claude-opus-5-5", max_tokens=4000,
-        output_config={"effort": "medium", "format": {"type": "json_schema", "schema": CHECK_SCHEMA}},
-        messages=[{"role": "user", "content": content}])
-    return json.loads(next(b.text for b in resp.content if b.type == "text"))
+    from .claude_call import structured
+    return structured("You check AI-made YouTube thumbnails against the real video frames.", content,
+                      CHECK_SCHEMA, model="claude-opus-5-5", max_tokens=4000)
 
 
 def tone(img: Image.Image, side: str = "left", style=None) -> dict:
@@ -396,6 +380,7 @@ def build_base(p, fr, tries: int = 4, style=None):
     text, nothing invented) and the tone gate passes (not white / washed out / split).
     A failing image is fixed by an AI edit when only the text or invented items are wrong,
     otherwise made again with the reasons; after the last try the best one is kept."""
+    tries = int(os.environ.get("THUMB_TRIES") or tries)    # subscription (Pro) has small limits: fewer checks
     style = style or p.get("_style")
     side = p.get("text_side", "left")
     feedback, best, prev, edit_next = "", None, None, False

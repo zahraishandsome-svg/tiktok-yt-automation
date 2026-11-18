@@ -118,7 +118,6 @@ def last_use(con, channel_id):
 
 
 def pick(anchor, cands, max_clips, retry_note=""):
-    import anthropic
     lines = [f"{c['id']} | {int(c['duration'])}s | {c.get('view_count') or 0} views | "
              f"{datetime.utcfromtimestamp(c.get('timestamp') or 0).date()} | "
              f"{(c.get('title') or '').replace(chr(10), ' ')[:90]}" for c in cands]
@@ -127,15 +126,30 @@ def pick(anchor, cands, max_clips, retry_note=""):
             "CANDIDATES (id | length | views | date | caption):\n" + "\n".join(lines))
     if retry_note:
         text += "\n\n" + retry_note
-    resp = anthropic.Anthropic().messages.create(
-        model=MODEL, max_tokens=4000, system=PICK_SYSTEM,
-        output_config={"effort": "medium", "format": {"type": "json_schema", "schema": PICK_SCHEMA}},
-        messages=[{"role": "user", "content": text}])
-    u = resp.usage
-    log.info("pick: %d in / %d out tokens", u.input_tokens, u.output_tokens)
-    if resp.stop_reason != "end_turn":
-        raise RuntimeError(f"pick stop_reason={resp.stop_reason}")
-    return json.loads(next(b.text for b in resp.content if b.type == "text"))
+    try:
+        from src.claude_call import structured
+        return structured(PICK_SYSTEM, text, PICK_SCHEMA, model=MODEL, max_tokens=4000)
+    except Exception as exc:  # noqa: BLE001 - no Claude today: never block the upload
+        log.warning("pick: Claude not available (%s) - using the no-Claude pick", str(exc)[:200])
+        return fallback_pick(anchor, cands, max_clips)
+
+
+def fallback_pick(anchor, cands, max_clips):
+    """Without Claude: the anchor plus the clips the creator posted closest in time to it
+    (usually the same day / same series), until the 3-minute minimum is reached."""
+    t0 = anchor.get("timestamp") or 0
+    near = sorted((c for c in cands if c.get("timestamp")), key=lambda c: abs((c.get("timestamp") or 0) - t0))
+    ids, total = [anchor["id"]], anchor["duration"]
+    for c in near:
+        if total >= MIN_TOTAL or len(ids) >= max_clips:
+            break
+        if abs((c.get("timestamp") or 0) - t0) > 3 * 86400:      # only clips within 3 days of the anchor
+            break
+        ids.append(c["id"])
+        total += c["duration"]
+    ok = total >= MIN_TOTAL and len(ids) <= max_clips
+    return {"possible": ok, "clip_ids": ids if ok else [], "topic": "same days' clips (no-Claude pick)",
+            "reason": f"fallback by posting time, total {int(total)} s"}
 
 
 def probe(path):

@@ -105,11 +105,11 @@ def title_for(db_path: Path, channel_id: str, tiktok_video_id: str) -> Optional[
 def write(video_path: Path, caption: str, lang: str, channel_id: str, tiktok_video_id: str,
           db_path: Path) -> Optional[dict]:
     """Return {"title", "description"} or None (caller keeps the old caption-based text)."""
-    if not os.environ.get("ANTHROPIC_API_KEY"):
-        logger.info("[%s] ai_metadata: no ANTHROPIC_API_KEY - using caption", channel_id)
+    if not (os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("CLAUDE_CODE_OAUTH_TOKEN")):
+        logger.info("[%s] ai_metadata: no Claude token or key - using caption", channel_id)
         return None
     try:
-        import anthropic
+        from .claude_call import structured
         with tempfile.TemporaryDirectory(prefix="meta_") as tmp:
             content = []
             for i, f in enumerate(_frames(Path(video_path), Path(tmp))):
@@ -121,20 +121,11 @@ def write(video_path: Path, caption: str, lang: str, channel_id: str, tiktok_vid
         if used:
             content.append({"type": "text", "text": "Titles this channel already used (write a clearly "
                             "different one): " + " / ".join(used)})
-        resp = anthropic.Anthropic().messages.create(
-            model=MODEL, max_tokens=4000, system=SYSTEM,
-            output_config={"effort": "medium", "format": {"type": "json_schema", "schema": SCHEMA}},
-            messages=[{"role": "user", "content": content}],
-        )
-        if resp.stop_reason != "end_turn":
-            raise RuntimeError(f"stop_reason={resp.stop_reason}")
-        d = json.loads(next(b.text for b in resp.content if b.type == "text"))
+        d = structured(SYSTEM, content, SCHEMA, model=MODEL, max_tokens=4000)
         title, desc = d["title"].strip(), d["description"].strip()
         if len(title) < 5:
             raise RuntimeError("title too short")
-        u = resp.usage
-        logger.info("[%s] ai_metadata: '%s' (%d in / %d out tokens)", channel_id, title,
-                    u.input_tokens, u.output_tokens)
+        logger.info("[%s] ai_metadata: '%s'", channel_id, title)
         con = _table(db_path)
         with con:
             con.execute("INSERT OR REPLACE INTO ai_metadata VALUES (?,?,?,?,?)",
